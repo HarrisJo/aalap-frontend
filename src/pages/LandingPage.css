@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap');
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.landing *, .landing *::before, .landing *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
   --teal:    #475B5A;
@@ -15,8 +15,8 @@
 }
 
 html { scroll-behavior: smooth; }
-body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; overflow-x: hidden; margin: 0; padding: 0; }
-.landing { overflow-x: hidden; }
+body { margin: 0; padding: 0; overflow-x: hidden; }
+.landing { font-family: var(--font-body); background: var(--white); color: #1a1a1a; overflow-x: hidden; }
 
 /* ── NAV ── */
 .nav {
@@ -137,7 +137,7 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   position: relative;
   height: 480px;
   animation: fadeUp 1s cubic-bezier(0.16,1,0.3,1) 0.4s both;
-  z-index: 2; /* Important for MusicStrings */
+  z-index: 2;
 }
 
 .avatar-float {
@@ -147,7 +147,7 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   gap: 12px;
   animation: floatBob 4s ease-in-out infinite;
   transition: transform 0.3s;
-  z-index: 10; /* Important: Keeps avatars above strings */
+  z-index: 10;
 }
 
 .avatar-float:hover { transform: scale(1.05) !important; }
@@ -173,7 +173,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
 
-/* NEW: The glow effect when the strings vibrate */
 .hero-right:hover .avatar-circle {
   border-color: var(--red);
   box-shadow: 0 0 15px rgba(255, 68, 57, 0.2);
@@ -204,7 +203,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   border-color: rgba(255,68,57,0.4);
 }
 
-/* Connection lines between avatars */
 .avatar-lines {
   position: absolute;
   inset: 0;
@@ -258,16 +256,14 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
 
 /* ── SINGLE TRACK MODERN MARQUEE ── */
 .marquee-section {
-  /* A rich, subtle gradient that is darker on the edges and lighter in the center */
   background: linear-gradient(90deg, var(--teal-dark) 0%, var(--teal) 50%, var(--teal-dark) 100%);
-  padding: 24px 0; /* Tight, sleek padding */
+  padding: 24px 0;
   overflow: hidden;
   display: flex;
   position: relative;
   border-bottom: 1px solid rgba(255, 212, 202, 0.05);
 }
 
-/* Adds a subtle "glowing" edge to the top of the marquee */
 .marquee-section::before {
   content: '';
   position: absolute;
@@ -280,7 +276,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   display: flex;
   white-space: nowrap;
   width: max-content;
-  /* (CSS animation removed, JS handles it now) */
 }
 
 .marquee-section:hover .marquee-track {
@@ -289,7 +284,7 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
 
 .marquee-item {
   font-family: var(--font-body);
-  font-size: 13px; /* Minimalist and crisp */
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 4px;
   text-transform: uppercase;
@@ -301,7 +296,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   gap: 24px;
 }
 
-/* The decorative star */
 .marquee-star {
   color: var(--red);
   font-size: 10px;
@@ -309,7 +303,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   opacity: 0.7;
 }
 
-/* ── MARQUEE KEYFRAMES ── */
 @keyframes marqueeScroll {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -682,7 +675,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   color: #ccc;
 }
 
-/* Play button with waveform state */
 .play-btn {
   width: 34px; height: 34px;
   border-radius: 50%;
@@ -711,7 +703,6 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   animation: playPulse 1s ease-in-out infinite;
 }
 
-/* Mini waveform inside playing button */
 .btn-wave {
   display: none;
   gap: 2px;
@@ -792,6 +783,7 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   80%  { transform: translate(1px, -2px);  }
   100% { transform: translate(0, 0);       }
 }
+
 .problem-bridge {
   font-family: var(--font-display);
   font-size: clamp(36px, 5.5vw, 80px);
@@ -921,7 +913,7 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   padding: 60px 48px;
   width: 100%;
   max-width: 460px;
-  min-height: 440px; /* Prevents card from shrinking during transition */
+  min-height: 440px;
   box-shadow: 0 20px 60px rgba(52, 68, 67, 0.15);
   position: relative;
   overflow: hidden;
@@ -947,6 +939,7 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   transform: scale(0.95);
   pointer-events: none;
 }
+
 .slot-group {
   display: flex;
   flex-direction: column;
@@ -967,12 +960,11 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   position: relative;
 }
 
-/* The track slides up and down inside the window */
 .slot-track {
   display: flex;
   flex-direction: column;
   transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  height: 300%; /* Because there are 3 items in the array */
+  height: 300%;
 }
 
 .slot-dynamic {
@@ -1025,5 +1017,3 @@ body { font-family: var(--font-body); background: var(--white); color: #1a1a1a; 
   color: var(--peach);
   opacity: 0.9;
 }
-
-

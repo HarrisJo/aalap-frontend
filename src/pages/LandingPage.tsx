@@ -3,6 +3,7 @@ import MusicStrings from './MusicStrings'
 import './LandingPage.css'
 import SlotMachine from './SlotMachine';
 import ScrollMarquee from "./ScrollMarquee.tsx";
+import { useNavigate } from 'react-router-dom'
 
 const NOTES = ['♩', '♪', '♫', '♬', '𝄞', '𝄢']
 
@@ -30,6 +31,7 @@ const CONTRIBUTIONS = [
 ]
 
 export default function LandingPage() {
+  const navigate = useNavigate()
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const heroTitleRef = useRef<HTMLHeadingElement>(null)
 
@@ -218,7 +220,7 @@ export default function LandingPage() {
         {/* ━━━━━━━━  NAV  ━━━━━━━━ */}
         <nav className="nav">
           <span className="nav-logo">AALAP</span>
-          <button className="nav-login" onClick={() => scrollTo('cta')}>Login</button>
+          <button className="nav-login" onClick={() => navigate('/auth')}>Login</button>
         </nav>
 
         {/* ━━━━━━━━  HERO  ━━━━━━━━ */}
@@ -237,7 +239,7 @@ export default function LandingPage() {
               <div className="hero-bottom">
                 <p className="hero-sub">No connections. No money. Just talent — and the right people finding each other.</p>
                 <div className="hero-actions">
-                  <button className="btn-primary" onClick={() => scrollTo('cta')}>Get Started</button>
+                  <button className="btn-primary" onClick={() => navigate('/auth')}>Get Started</button>
                   <button className="btn-ghost"   onClick={() => scrollTo('flow')}>See how it works</button>
                 </div>
               </div>
@@ -395,7 +397,7 @@ export default function LandingPage() {
             Join musicians, lyricists, singers and producers<br />
             building songs together — one thread at a time.
           </p>
-          <button className="btn-primary btn-xl" data-reveal onClick={() => scrollTo('cta')}>
+          <button className="btn-primary btn-xl" data-reveal onClick={() => navigate('/auth')}>
             Start Your First Thread
           </button>
         </section>
