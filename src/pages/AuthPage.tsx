@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { AuthService } from '../services/AuthService';
+import {useNavigate} from "react-router-dom";
 
 export default function AuthPage() {
+    const navigate = useNavigate();
     // 1. UI Switches
     const [isLoginPage, setIsLoginPage] = useState(true);
     const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -23,8 +25,7 @@ export default function AuthPage() {
             const data = await AuthService.login(loginEmail, loginPassword);
             localStorage.setItem("token", data.token);
             console.log("LOGIN SUCCESS:", data);
-            alert("Studio access granted! Welcome back.");
-            // Here we would normally redirect to the Dashboard
+            navigate('/home')
         } catch (error: any) {
             console.error("LOGIN ERROR:", error);
             alert(error.response?.data?.message || "Login failed. Check your connection.");
@@ -40,8 +41,7 @@ export default function AuthPage() {
             const data = await AuthService.register(registerStageName, registerEmail, registerPassword);
             localStorage.setItem("token", data.token);
             console.log("REGISTER SUCCESS:", data);
-            alert("Account created! Welcome to the network.");
-            // Here we would normally redirect to the Dashboard
+            navigate('/home')
         } catch (error: any) {
             console.error("REGISTER ERROR:", error);
             alert(error.response?.data?.message || "Registration failed. Stage name or Email might be taken.");
