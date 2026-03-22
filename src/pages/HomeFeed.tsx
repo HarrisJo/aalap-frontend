@@ -74,6 +74,10 @@ export default function HomeFeed() {
 
             <style>
                 {`
+                    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;500;600&family=DM+Sans:wght@300;400;500&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap');
+                    .font-anton { font-family: 'Anton', sans-serif; }
+                    .font-barlow { font-family: 'Barlow Condensed', sans-serif; }
+                    .font-cormorant { font-family: 'Cormorant Garamond', serif; }
                     @keyframes subtle-float { 0% { transform: translateY(0px); } 50% { transform: translateY(-4px); } 100% { transform: translateY(0px); } }
                     @keyframes thread-pulse { 0% { opacity: 0.15; stroke-width: 1; } 50% { opacity: 0.4; stroke-width: 1.5; } 100% { opacity: 0.15; stroke-width: 1; } }
                     @keyframes wave-bounce { 0%, 100% { height: 4px; } 50% { height: 16px; } }
@@ -107,24 +111,25 @@ export default function HomeFeed() {
 
                     {isNavOpen ? (
                         <div className="flex flex-col h-full animate-[fade-in_0.3s_ease-out]">
-                            <div className="mb-12 px-4 cursor-pointer" onClick={() => navigate('/home')}>
-                                <h1 className="font-bebas text-5xl text-[#FCFCFC] tracking-wide drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">AALAP</h1>
-                                <p className="font-cormorant italic text-lg text-[#FFD4CA] mt-[-4px] whitespace-nowrap">Music collaboration, reimagined.</p>
+                            <div className="mb-10 px-1 cursor-pointer" onClick={() => navigate('/home')}>
+                                <h1 className="font-anton text-[2.4rem] text-[#FCFCFC] tracking-wide leading-none">AALAP</h1>
+                                <div className="w-7 h-[2px] bg-[#FF4439] my-2"></div>
+                                <p className="font-cormorant italic text-base text-[#FFD4CA]/60 whitespace-nowrap">Music collaboration, reimagined.</p>
                             </div>
                             <nav className="flex flex-col gap-2 font-dm">
-                                <button className="flex items-center gap-4 px-4 py-3 bg-white/5 text-white rounded-2xl border border-white/10 transition-all">
+                                <button className="flex items-center gap-4 px-4 py-3 bg-white/5 text-white rounded-xl border border-white/8 transition-all relative before:absolute before:left-0 before:top-[20%] before:bottom-[20%] before:w-[2px] before:bg-[#FF4439] before:rounded-r-full overflow-hidden">
                                     <svg className="w-6 h-6 text-[#FFD4CA]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                                     <span className="text-lg font-medium tracking-wide">Studio Feed</span>
                                 </button>
-                                <button className="flex items-center gap-4 px-4 py-3 text-white/50 hover:text-white hover:bg-white/[0.02] rounded-2xl transition-all">
+                                <button className="flex items-center gap-4 px-4 py-3 text-white/40 hover:text-white hover:bg-white/[0.03] rounded-xl transition-all">
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
                                     <span className="text-lg tracking-wide">Discover Threads</span>
                                 </button>
-                                <button className="flex items-center gap-4 px-4 py-3 text-white/50 hover:text-white hover:bg-white/[0.02] rounded-2xl transition-all">
+                                <button className="flex items-center gap-4 px-4 py-3 text-white/40 hover:text-white hover:bg-white/[0.03] rounded-xl transition-all">
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                                     <span className="text-lg tracking-wide">My Tracks</span>
                                 </button>
-                                <button className="flex items-center gap-4 px-4 py-3 text-white/50 hover:text-white hover:bg-white/[0.02] rounded-2xl transition-all group relative">
+                                <button className="flex items-center gap-4 px-4 py-3 text-white/40 hover:text-white hover:bg-white/[0.03] rounded-xl transition-all group relative">
                                     <div className="absolute top-3 left-8 w-2 h-2 bg-[#FF4439] rounded-full shadow-[0_0_8px_#FF4439]"></div>
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                                     <span className="text-lg tracking-wide">Messages</span>
@@ -133,13 +138,13 @@ export default function HomeFeed() {
                             <div className="mt-auto pb-4">
                                 <button className="w-full bg-[#FF4439] hover:bg-[#B72F30] text-white font-dm px-6 py-4 rounded-2xl transition-all shadow-lg shadow-[#FF4439]/20 flex items-center justify-center gap-3">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>
-                                    <span className="font-semibold text-lg">Start a Thread</span>
+                                    <span className="font-anton text-base tracking-[0.08em]">START A THREAD</span>
                                 </button>
                                 <div className="mt-6 flex items-center gap-4 px-4 py-3 bg-[#131B1A] border border-white/5 rounded-2xl">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-[#FFD4CA] flex items-center justify-center text-black font-bebas text-xl shrink-0">HJ</div>
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-[#FFD4CA] flex items-center justify-center text-black font-anton text-sm shrink-0">HJ</div>
                                     <div className="overflow-hidden">
                                         <p className="font-dm text-sm text-white font-medium truncate">Harris Joshua</p>
-                                        <p className="font-dm text-xs text-white/40 truncate">Pianist & Composer</p>
+                                        <p className="font-barlow font-medium text-[10px] text-white/35 truncate tracking-[0.12em] uppercase">Pianist & Composer</p>
                                     </div>
                                 </div>
                             </div>
@@ -147,7 +152,7 @@ export default function HomeFeed() {
                     ) : (
                         <div className="flex flex-col h-full w-full items-center justify-center animate-[fade-in_0.5s_ease-out] relative">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2">
-                                <h1 className="font-bebas text-5xl text-white/5 tracking-[0.2em] transform -rotate-180" style={{ writingMode: 'vertical-rl' }}>AALAP</h1>
+                                <h1 className="font-anton text-5xl text-white/5 tracking-[0.2em] transform -rotate-180" style={{ writingMode: 'vertical-rl' }}>AALAP</h1>
                             </div>
                             <div className="flex items-center gap-4 h-[40vh] mt-20">
                                 <div className="w-[2px] h-full bg-gradient-to-b from-transparent via-[#FFD4CA]/50 to-transparent animate-[ambient-breathe_6s_ease-in-out_infinite] blur-[1px]"></div>
