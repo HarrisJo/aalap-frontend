@@ -1,315 +1,703 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { ThreadService } from '../services/ThreadService';
 
-// --- TYPES & INTERFACES ---
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
 interface UserInfo {
-    id: number;
-    name: string;
-    email: string;
-    avatar?: string;
+  id: number;
+  name: string;
+  email: string;
 }
 
 interface ThreadSummary {
-    id: number;
-    title: string;
-    description: string;
-    createdBy: UserInfo;
-    createdAt: string;
-    contributionCount: number;
-    rolesWithContributors: {
-        [role: string]: string[];
-    };
-    audioPreviewUrl?: string;
-    hasSaved: boolean;
+  id: number;
+  title: string;
+  description: string;
+  createdBy: UserInfo;
+  createdAt: string;
+  contributionCount: number;
+  rolesWithContributors: { [role: string]: string[] };
 }
 
+interface Toast {
+  message: string;
+  type: 'success' | 'error';
+}
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
+// Redesigned with the new color palette
+const ROLE_COLORS: Record<string, { text: string; bg: string; dot: string }> = {
+  composer:        { text: 'text-[#1a1a1a]',  bg: 'bg-[#FFD4CA]',     dot: '#FFD4CA' }, // Peach
+  lyricist:        { text: 'text-[#FCFCFC]',  bg: 'bg-[#FF4439]',     dot: '#FF4439' }, // Red
+  singer:          { text: 'text-[#FCFCFC]',  bg: 'bg-[#B72F30]',     dot: '#B72F30' }, // Crimson
+  producer:        { text: 'text-[#1a1a1a]',  bg: 'bg-[#FCFCFC]',     dot: '#FCFCFC' }, // White
+  instrumentalist: { text: 'text-[#FCFCFC]',  bg: 'bg-[#475B5A]',     dot: '#475B5A' }, // Teal
+};
+
+const DEFAULT_RC = { text: 'text-[#FCFCFC]/40', bg: 'bg-[#FCFCFC]/5', dot: '#FCFCFC40' };
+
+function getRoleColor(role: string) {
+  const key = role.split(' - ')[0].toLowerCase().trim();
+  return ROLE_COLORS[key] ?? DEFAULT_RC;
+}
+
+function getInitial(name?: string) {
+  return (name && name !== '?') ? name.charAt(0).toUpperCase() : '?';
+}
+
+function timeAgo(dateStr: string): string {
+  const diff  = Date.now() - new Date(dateStr).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+
+  if (mins  < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days  < 7)  return `${days}d ago`;
+
+  if (days > 180) {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+const ALL_ROLES = ['Composer', 'Lyricist', 'Singer', 'Producer', 'Instrumentalist'];
+
+// ─── COMPONENT ────────────────────────────────────────────────────────────────
+
 export default function HomeFeed() {
-    const navigate = useNavigate();
-    const [nools, setNools] = useState<ThreadSummary[]>([]);
-    const [playingId, setPlayingId] = useState<number | null>(null);
-    const [isNavOpen, setIsNavOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchNools = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/auth');
-                return;
-            }
+  const [threads, setThreads]       = useState<ThreadSummary[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [search, setSearch]         = useState('');
+  const [filterRole, setFilterRole] = useState<string | null>(null);
+  const [userName, setUserName]     = useState<string>('?');
 
-            try {
-                const response = await axios.get('https://aalap-backend-1.onrender.com/api/threads', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setNools(response.data);
-            } catch (error) {
-                console.error("Failed to sync with Aalap server:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+  const [toast, setToast]           = useState<Toast | null>(null);
+  const toastTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-        fetchNools();
-    }, [navigate]);
+  const [modalOpen, setModalOpen]           = useState(false);
+  const [newTitle, setNewTitle]             = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [isCreating, setIsCreating]         = useState(false);
 
-    const togglePlay = (e: React.MouseEvent, id: number) => {
-        e.stopPropagation();
-        setPlayingId(playingId === id ? null : id);
-    };
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUserName(payload.name || payload.username || '?');
+      } catch (e) {
+        console.warn("Failed to parse token payload for user info");
+      }
+    }
+  }, []);
 
-    const toggleSave = (e: React.MouseEvent, id: number) => {
-        e.stopPropagation();
-        setNools(nools.map(nool => {
-            if (nool.id === id) {
-                return { ...nool, hasSaved: !nool.hasSaved };
-            }
-            return nool;
-        }));
-    };
+  const showToast = useCallback((message: string, type: Toast['type']) => {
+    setToast({ message, type });
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+  }, []);
 
-    return (
-        <div className="min-h-screen bg-[#0A0E0D] text-[#FCFCFC] overflow-hidden flex justify-center relative selection:bg-[#FF4439]/30">
+  const fetchThreads = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { navigate('/auth'); return; }
+    try {
+      const res = await axios.get('https://aalap-backend-1.onrender.com/api/threads', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setThreads(res.data);
+    } catch {
+      showToast('Failed to load feed. Check your connection.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate, showToast]);
 
-            <style>
-                {`
-                    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@400;500;600&family=DM+Sans:wght@300;400;500&family=Cormorant+Garamond:ital,wght@1,400;1,500&display=swap');
-                    .font-anton { font-family: 'Anton', sans-serif; }
-                    .font-barlow { font-family: 'Barlow Condensed', sans-serif; }
-                    .font-cormorant { font-family: 'Cormorant Garamond', serif; }
-                    @keyframes subtle-float { 0% { transform: translateY(0px); } 50% { transform: translateY(-4px); } 100% { transform: translateY(0px); } }
-                    @keyframes thread-pulse { 0% { opacity: 0.15; stroke-width: 1; } 50% { opacity: 0.4; stroke-width: 1.5; } 100% { opacity: 0.15; stroke-width: 1; } }
-                    @keyframes wave-bounce { 0%, 100% { height: 4px; } 50% { height: 16px; } }
-                    @keyframes ambient-breathe { 0%, 100% { transform: scaleY(0.4); opacity: 0.3; } 50% { transform: scaleY(1); opacity: 0.8; } }
-                    @keyframes fade-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-                    .no-scrollbar::-webkit-scrollbar { display: none; }
-                    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                `}
-            </style>
+  useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-900/10 blur-[120px] rounded-full pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[40%] bg-[#FF4439]/5 blur-[120px] rounded-full pointer-events-none"></div>
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+    setIsCreating(true);
+    try {
+      const newThread = await ThreadService.createThread(newTitle, newDescription);
+      setNewTitle(''); setNewDescription(''); setModalOpen(false);
+      navigate(`/threads/${newThread.id}`);
+    } catch {
+      showToast('Failed to create thread. Try again.', 'error');
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
-            <div className="w-full max-w-[1600px] grid grid-cols-12 h-screen relative z-10 px-6 gap-8">
+  const filtered = useMemo(() => threads.filter(t => {
+    const matchesSearch = !search.trim() ||
+        t.title.toLowerCase().includes(search.toLowerCase()) ||
+        t.description?.toLowerCase().includes(search.toLowerCase()) ||
+        t.createdBy.name.toLowerCase().includes(search.toLowerCase());
+    const matchesRole = !filterRole ||
+        Object.keys(t.rolesWithContributors).some(r => r.toLowerCase().includes(filterRole.toLowerCase()));
+    return matchesSearch && matchesRole;
+  }), [threads, search, filterRole]);
 
-                {/* --- PANE 1: LEFT NAVIGATION --- */}
-                <aside className="col-span-3 hidden lg:flex flex-col py-8 h-full border-r border-white/5 pr-6 relative">
-                    <div className="absolute top-8 right-6 z-50">
-                        <button onClick={() => setIsNavOpen(!isNavOpen)} className="w-12 h-12 rounded-full bg-white/[0.03] border border-white/10 hover:bg-white/10 hover:border-[#FFD4CA]/50 flex items-center justify-center transition-all group shadow-lg">
-                            {isNavOpen ? (
-                                <svg className="w-5 h-5 text-white/70 group-hover:text-[#FFD4CA] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                            ) : (
-                                <div className="space-y-1.5 flex flex-col items-end">
-                                    <div className="w-5 h-[2px] bg-white/70 group-hover:bg-[#FFD4CA] rounded-full transition-colors"></div>
-                                    <div className="w-4 h-[2px] bg-white/70 group-hover:bg-[#FFD4CA] rounded-full transition-colors"></div>
-                                    <div className="w-5 h-[2px] bg-white/70 group-hover:bg-[#FFD4CA] rounded-full transition-colors"></div>
-                                </div>
-                            )}
+  return (
+      <div className="min-h-screen text-[#FCFCFC] relative">
+
+        {/* VIDEO BACKGROUND */}
+        <video
+            autoPlay muted loop playsInline
+            className="fixed inset-0 w-full h-full object-cover z-0 brightness-[0.3]"
+            src="/homefeedbg.mp4"
+        />
+        {/* Dark overlay */}
+        <div className="fixed inset-0 bg-[#1a1a1a]/60 z-0" />
+
+        {/* All content sits above the video */}
+        <div className="relative z-10">
+
+          <link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+
+          <style>{`
+                .font-anton { font-family: 'Anton', sans-serif; }
+                .font-dm    { font-family: 'DM Sans', sans-serif; }
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                
+                @keyframes toast-up       { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes modal-in       { from { opacity:0; transform:scale(0.97) translateY(6px); } to { opacity:1; transform:scale(1) translateY(0); } }
+                @keyframes card-in        { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+                @keyframes label-rise     { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+                
+                @keyframes thread-draw    { from { stroke-dashoffset: 1400; } to { stroke-dashoffset: 0; } }
+                @keyframes thread-breathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+                
+                @keyframes thread-flow-hero { 
+                    from { stroke-dashoffset: 300; } 
+                    to   { stroke-dashoffset: 0; } 
+                }
+                
+                @keyframes core-pulse {
+                    0%, 100% { transform: scale(1); opacity: 0.8; filter: brightness(1); }
+                    50%      { transform: scale(1.35); opacity: 1; filter: brightness(1.5); }
+                }
+                
+                @keyframes energy-ripple {
+                    0%   { transform: scale(0.8); opacity: 1; stroke-width: 2; }
+                    100% { transform: scale(2.5); opacity: 0; stroke-width: 0; }
+                }
+                
+                @keyframes node-appear { 
+                    0%   { opacity:0; transform: scale(0); } 
+                    70%  { opacity:1; transform: scale(1.4); } 
+                    100% { opacity:1; transform: scale(1); } 
+                }
+            `}</style>
+
+          {/* TOAST */}
+          {toast && (
+              <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-2xl
+                    text-sm font-dm backdrop-blur-md border shadow-2xl whitespace-nowrap animate-[toast-up_0.25s_ease-out]
+                    ${toast.type === 'success' ? 'bg-[#344443]/90 border-[#475B5A] text-[#FFD4CA]' : 'bg-[#B72F30]/90 border-[#FF4439]/50 text-[#FCFCFC]'}`}>
+                {toast.message}
+              </div>
+          )}
+
+          {/* MODAL */}
+          {modalOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setModalOpen(false)} />
+
+                <div className="relative w-full max-w-[480px] animate-[modal-in_0.25s_ease-out]">
+
+                  {/* Outer glow ring */}
+                  <div className="absolute -inset-[1px] rounded-3xl z-0"
+                       style={{ background: 'linear-gradient(135deg, rgba(255,68,57,0.4) 0%, rgba(71,91,90,0.2) 50%, rgba(255,212,202,0.2) 100%)' }} />
+
+                  {/* Modal body */}
+                  <div className="relative z-10 bg-[#080C0B]/95 backdrop-blur-2xl rounded-3xl overflow-hidden">
+
+                    {/* Top accent bar */}
+                    <div className="h-[3px] w-full" style={{ background: 'linear-gradient(90deg, #FF4439, #FFD4CA, #475B5A)' }} />
+
+                    {/* Subtle inner glow top-left */}
+                    <div className="absolute top-0 left-0 w-64 h-64 rounded-full pointer-events-none"
+                         style={{ background: 'radial-gradient(circle, rgba(255,68,57,0.06) 0%, transparent 70%)', transform: 'translate(-30%, -30%)' }} />
+
+                    <div className="relative z-10 p-8">
+
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-8">
+                        <div>
+                          <p className="font-dm text-[10px] text-[#FF4439]/70 uppercase tracking-[0.3em] mb-2">New creation</p>
+                          <h2 className="font-anton text-4xl text-[#FCFCFC] tracking-wide uppercase leading-none">Start a<br/>Thread</h2>
+                          <p className="font-dm text-sm text-[#FFD4CA]/40 mt-3 italic">Plant the seed. Let others grow it.</p>
+                        </div>
+                        <button onClick={() => setModalOpen(false)}
+                                className="w-10 h-10 rounded-full border border-[#FCFCFC]/10 bg-[#FCFCFC]/5
+                                         hover:bg-[#FF4439]/10 hover:border-[#FF4439]/40
+                                         flex items-center justify-center text-[#FCFCFC]/30 hover:text-[#FF4439]
+                                         transition-all duration-200 shrink-0">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
                         </button>
+                      </div>
+
+                      {/* Form */}
+                      <form onSubmit={handleCreate} className="flex flex-col gap-5">
+
+                        {/* Title field */}
+                        <div className="flex flex-col gap-2">
+                          <label className="font-dm text-[10px] text-[#FCFCFC]/30 uppercase tracking-[0.25em] flex items-center gap-2">
+                            <span className="w-3 h-[1px] bg-[#FF4439]/60 inline-block" />
+                            Thread title
+                          </label>
+                          <div className="relative group">
+                            <input
+                                type="text" required autoFocus
+                                value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                                placeholder="e.g. Midnight Melody"
+                                className="w-full bg-[#FCFCFC]/[0.03] border border-[#FCFCFC]/10
+                                       text-[#FCFCFC] placeholder:text-[#FCFCFC]/15
+                                       px-5 py-4 rounded-2xl font-dm text-base
+                                       focus:outline-none focus:border-[#FF4439]/50 focus:bg-[#FF4439]/[0.03]
+                                       transition-all duration-200"
+                            />
+                            {/* Focus line bottom */}
+                            <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-[#FF4439]/0 via-[#FF4439]/60 to-[#FF4439]/0
+                                          scale-x-0 group-focus-within:scale-x-100 transition-transform duration-300 rounded-full" />
+                          </div>
+                        </div>
+
+                        {/* Description field */}
+                        <div className="flex flex-col gap-2">
+                          <label className="font-dm text-[10px] text-[#FCFCFC]/30 uppercase tracking-[0.25em] flex items-center gap-2">
+                            <span className="w-3 h-[1px] bg-[#475B5A]/80 inline-block" />
+                            Description
+                            <span className="normal-case text-[#FCFCFC]/15 tracking-normal">— optional</span>
+                          </label>
+                          <div className="relative group">
+                          <textarea
+                              rows={3}
+                              value={newDescription} onChange={e => setNewDescription(e.target.value)}
+                              placeholder="What's the vibe? Genre, mood, key, BPM..."
+                              className="w-full bg-[#FCFCFC]/[0.03] border border-[#FCFCFC]/10
+                                       text-[#FCFCFC] placeholder:text-[#FCFCFC]/15
+                                       px-5 py-4 rounded-2xl font-dm text-sm
+                                       focus:outline-none focus:border-[#475B5A]/60 focus:bg-[#475B5A]/[0.03]
+                                       transition-all duration-200 resize-none leading-relaxed"
+                          />
+                            <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-[#475B5A]/0 via-[#475B5A]/60 to-[#475B5A]/0
+                                          scale-x-0 group-focus-within:scale-x-100 transition-transform duration-300 rounded-full" />
+                          </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="h-px bg-gradient-to-r from-transparent via-[#475B5A]/30 to-transparent" />
+
+                        {/* Submit */}
+                        <button
+                            type="submit"
+                            disabled={isCreating || !newTitle.trim()}
+                            className={`group/btn relative w-full py-3.5 rounded-xl font-anton tracking-[0.2em] text-sm uppercase
+                                    overflow-hidden transition-all duration-300 active:scale-[0.98]
+                                    ${(isCreating || !newTitle.trim())
+                                ? 'bg-[#FCFCFC]/5 text-[#FCFCFC]/20 cursor-not-allowed border border-[#FCFCFC]/5'
+                                : 'text-[#FCFCFC]/70 hover:text-[#FCFCFC] border border-[#B72F30]/50 hover:border-[#B72F30]'}`}
+                        >
+                          {(!isCreating && newTitle.trim()) && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-4 h-4 rounded-full scale-0 group-hover/btn:scale-[12] transition-transform duration-500 ease-out"
+                                     style={{ background: 'radial-gradient(circle, #C73330 0%, #7A1A1A 100%)' }} />
+                              </div>
+                          )}
+                          <span className="relative z-10 flex items-center justify-center gap-2.5">
+                          {isCreating ? (
+                              <>
+                                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                </svg>
+                                Creating...
+                              </>
+                          ) : (
+                              <>
+                                <svg className="w-3.5 h-3.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Open Thread
+                              </>
+                          )}
+                        </span>
+                        </button>
+
+                      </form>
                     </div>
+                  </div>
+                </div>
+              </div>
+          )}
 
-                    {isNavOpen ? (
-                        <div className="flex flex-col h-full animate-[fade-in_0.3s_ease-out]">
-                            <div className="mb-10 px-1 cursor-pointer" onClick={() => navigate('/home')}>
-                                <h1 className="font-anton text-[2.4rem] text-[#FCFCFC] tracking-wide leading-none">AALAP</h1>
-                                <div className="w-7 h-[2px] bg-[#FF4439] my-2"></div>
-                                <p className="font-cormorant italic text-base text-[#FFD4CA]/60 whitespace-nowrap">Music collaboration, reimagined.</p>
-                            </div>
-                            <nav className="flex flex-col gap-2 font-dm">
-                                <button className="flex items-center gap-4 px-4 py-3 bg-white/5 text-white rounded-xl border border-white/8 transition-all relative before:absolute before:left-0 before:top-[20%] before:bottom-[20%] before:w-[2px] before:bg-[#FF4439] before:rounded-r-full overflow-hidden">
-                                    <svg className="w-6 h-6 text-[#FFD4CA]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                                    <span className="text-lg font-medium tracking-wide">Studio Feed</span>
-                                </button>
-                                <button className="flex items-center gap-4 px-4 py-3 text-white/40 hover:text-white hover:bg-white/[0.03] rounded-xl transition-all">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
-                                    <span className="text-lg tracking-wide">Discover Threads</span>
-                                </button>
-                                <button className="flex items-center gap-4 px-4 py-3 text-white/40 hover:text-white hover:bg-white/[0.03] rounded-xl transition-all">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                                    <span className="text-lg tracking-wide">My Tracks</span>
-                                </button>
-                                <button className="flex items-center gap-4 px-4 py-3 text-white/40 hover:text-white hover:bg-white/[0.03] rounded-xl transition-all group relative">
-                                    <div className="absolute top-3 left-8 w-2 h-2 bg-[#FF4439] rounded-full shadow-[0_0_8px_#FF4439]"></div>
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                                    <span className="text-lg tracking-wide">Messages</span>
-                                </button>
-                            </nav>
-                            <div className="mt-auto pb-4">
-                                <button className="w-full bg-[#FF4439] hover:bg-[#B72F30] text-white font-dm px-6 py-4 rounded-2xl transition-all shadow-lg shadow-[#FF4439]/20 flex items-center justify-center gap-3">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"></path></svg>
-                                    <span className="font-anton text-base tracking-[0.08em]">START A THREAD</span>
-                                </button>
-                                <div className="mt-6 flex items-center gap-4 px-4 py-3 bg-[#131B1A] border border-white/5 rounded-2xl">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-[#FFD4CA] flex items-center justify-center text-black font-anton text-sm shrink-0">HJ</div>
-                                    <div className="overflow-hidden">
-                                        <p className="font-dm text-sm text-white font-medium truncate">Harris Joshua</p>
-                                        <p className="font-barlow font-medium text-[10px] text-white/35 truncate tracking-[0.12em] uppercase">Pianist & Composer</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col h-full w-full items-center justify-center animate-[fade-in_0.5s_ease-out] relative">
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2">
-                                <h1 className="font-anton text-5xl text-white/5 tracking-[0.2em] transform -rotate-180" style={{ writingMode: 'vertical-rl' }}>AALAP</h1>
-                            </div>
-                            <div className="flex items-center gap-4 h-[40vh] mt-20">
-                                <div className="w-[2px] h-full bg-gradient-to-b from-transparent via-[#FFD4CA]/50 to-transparent animate-[ambient-breathe_6s_ease-in-out_infinite] blur-[1px]"></div>
-                                <div className="w-[3px] h-full bg-gradient-to-b from-transparent via-teal-500/40 to-transparent animate-[ambient-breathe_8s_ease-in-out_infinite_1s] blur-[2px]"></div>
-                                <div className="w-[1px] h-[70%] bg-gradient-to-b from-transparent via-[#FF4439]/60 to-transparent animate-[ambient-breathe_5s_ease-in-out_infinite_2.5s]"></div>
-                                <div className="w-[2px] h-[90%] bg-gradient-to-b from-transparent via-white/20 to-transparent animate-[ambient-breathe_7s_ease-in-out_infinite_0.5s]"></div>
-                            </div>
-                            <p className="font-dm text-[10px] text-white/20 tracking-widest uppercase mt-12 animate-pulse">Studio Standby</p>
-                        </div>
-                    )}
-                </aside>
-
-                {/* --- PANE 2: THE MAIN FEED --- */}
-                <main className="col-span-12 lg:col-span-6 xl:col-span-6 h-full overflow-y-auto no-scrollbar py-8 flex flex-col gap-6 relative">
-                    <header className="sticky top-0 z-50 bg-[#0A0E0D]/80 backdrop-blur-xl border border-white/5 rounded-[2rem] p-2 flex items-center justify-between shadow-2xl mb-4">
-                        <div className="flex-grow flex items-center px-4 gap-3">
-                            <svg className="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            <input type="text" placeholder="Search tracks, roles, or creators..." className="w-full bg-transparent border-none outline-none text-white/80 font-dm placeholder-white/30 text-lg py-2" />
-                        </div>
-                        <div className="flex items-center gap-2 pr-4">
-                            <kbd className="px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-white/40 font-dm text-xs hidden sm:block">CTRL</kbd>
-                            <kbd className="px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-white/40 font-dm text-xs hidden sm:block">K</kbd>
-                        </div>
-                    </header>
-
-                    <div className="space-y-8 pb-32">
-                        {isLoading ? (
-                            <div className="text-center py-20 font-dm text-white/20 animate-pulse">Syncing with server...</div>
-                        ) : nools.map((nool, index) => (
-                            <div
-                                key={nool.id}
-                                className="bg-white/[0.02] backdrop-blur-md border border-white/5 rounded-[2rem] p-8 cursor-pointer transition-all duration-300 hover:bg-white/[0.04] hover:border-[#FFD4CA]/20 hover:shadow-2xl hover:shadow-[#FFD4CA]/5 flex flex-col relative group"
-                                style={{ animation: `subtle-float 6s ease-in-out infinite`, animationDelay: `${index * 0.4}s` }}
-                                onClick={() => navigate(`/threads/${nool.id}`)}
-                            >
-                                <div className="flex justify-between items-start mb-6 relative z-10">
-                                    <div className="pr-6 flex-grow">
-                                        <div className="flex items-center gap-4 mb-2">
-                                            <button onClick={(e) => togglePlay(e, nool.id)} className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all ${playingId === nool.id ? 'bg-[#FFD4CA] text-black shadow-[0_0_20px_rgba(255,212,202,0.4)]' : 'bg-[#131B1A] border border-white/10 text-[#FFD4CA] hover:bg-white/10'}`}>
-                                                {playingId === nool.id ? <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg> : <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-                                            </button>
-                                            <div>
-                                                <h2 className="font-bebas text-4xl text-[#FCFCFC] tracking-wider group-hover:text-[#FFD4CA] transition-colors leading-none">{nool.title}</h2>
-                                                <div className="flex items-center gap-2 mt-2">
-                                                    <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bebas text-white/70">
-                                                        {nool.createdBy.name.charAt(0)}
-                                                    </div>
-                                                    <p className="font-dm text-white/50 text-sm">Started by <span className="text-white/80 hover:underline">{nool.createdBy.name}</span></p>
-                                                    {playingId === nool.id && (
-                                                        <div className="flex items-end gap-[2px] h-4 ml-3">
-                                                            <div className="w-[3px] bg-[#FFD4CA] rounded-full animate-[wave-bounce_0.8s_ease-in-out_infinite]"></div>
-                                                            <div className="w-[3px] bg-[#FFD4CA] rounded-full animate-[wave-bounce_1.2s_ease-in-out_infinite_0.2s]"></div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-[#131B1A] px-5 py-3 rounded-2xl border border-white/5 text-center flex flex-col justify-center shadow-inner shrink-0 group-hover:border-[#FFD4CA]/20 transition-colors">
-                                        <span className="block font-bebas text-[#FCFCFC] text-2xl leading-none">{nool.contributionCount}</span>
-                                        <span className="block font-dm text-[10px] text-teal-200/50 uppercase tracking-widest mt-1.5">Tracks</span>
-                                    </div>
-                                </div>
-                                <p className="font-dm text-white/70 mb-8 text-lg leading-relaxed relative z-10">{nool.description}</p>
-                                <div className="relative mt-auto pt-4 pb-6">
-                                    <div className="absolute top-[calc(50%-12px)] left-0 w-full h-8 -translate-y-1/2 overflow-hidden pointer-events-none">
-                                        <svg viewBox="0 0 200 20" preserveAspectRatio="none" className="w-full h-full text-[#FFD4CA]">
-                                            <path d="M -10,10 Q 15,25 40,10 T 90,10 T 140,10 T 190,10 T 240,10" fill="none" stroke="currentColor" style={{ animation: 'thread-pulse 4s ease-in-out infinite' }} />
-                                        </svg>
-                                    </div>
-                                    <div className="flex flex-wrap gap-x-6 gap-y-4 relative z-10">
-                                        {Object.entries(nool.rolesWithContributors).map(([role, users]) => (
-                                            <div key={role} className="flex items-center gap-3 group/node">
-                                                <div className="w-2 h-2 rounded-full bg-[#FFD4CA] shadow-[0_0_10px_rgba(255,212,202,0.8)] group-hover/node:scale-150 transition-transform"></div>
-                                                <div className="px-5 py-2 bg-[#131B1A] border border-white/10 rounded-full flex items-center gap-2 shadow-lg">
-                                                    <span className="font-dm text-sm text-[#FFD4CA] font-medium tracking-wide">{role}</span>
-                                                    <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                                                    <span className="font-dm text-xs text-white/60">{users.join(', ')}</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between pt-6 mt-2 border-t border-white/5 relative z-10">
-                                    <button onClick={(e) => { e.stopPropagation(); }} className="flex items-center gap-2 text-white/50 hover:text-white transition-colors group/btn">
-                                        <svg className="w-6 h-6 transition-transform group-hover/btn:scale-110" fill="none" strokeWidth="1.5" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                                        <span className="font-dm text-sm font-medium">Share</span>
-                                    </button>
-                                    <button onClick={(e) => toggleSave(e, nool.id)} className={`transition-colors group/btn flex items-center gap-2 ${nool.hasSaved ? 'text-[#FFD4CA]' : 'text-white/50 hover:text-[#FFD4CA]'}`}>
-                                        <span className="font-dm text-sm font-medium">{nool.hasSaved ? 'Saved' : 'Save'}</span>
-                                        {nool.hasSaved ? <svg className="w-6 h-6 transition-transform group-hover/btn:scale-110" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M6.5 3A2.5 2.5 0 004 5.5v15.5l8-4.5 8 4.5V5.5A2.5 2.5 0 0017.5 3h-11z" clipRule="evenodd" /></svg> : <svg className="w-6 h-6 transition-transform group-hover/btn:scale-110" fill="none" strokeWidth="1.5" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.5 3h-11a2.5 2.5 0 00-2.5 2.5v15.5l8-4.5 8 4.5V5.5A2.5 2.5 0 0017.5 3z" /></svg>}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </main>
-
-                {/* --- PANE 3: DISCOVERY / CONTEXT --- */}
-                <aside className="col-span-3 hidden xl:flex flex-col py-8 h-full border-l border-white/5 pl-6 overflow-y-auto no-scrollbar">
-                    {/* Widget: Roles in Demand */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 mb-8 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF4439]/10 blur-3xl rounded-full"></div>
-                        <h3 className="font-bebas text-2xl text-white mb-6 flex items-center gap-2 relative z-10">
-                            <svg className="w-5 h-5 text-[#FF4439]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            Roles in Demand
-                        </h3>
-                        <div className="space-y-4 relative z-10">
-                            <div className="flex justify-between items-center group cursor-pointer">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-[#131B1A] flex items-center justify-center border border-white/10 group-hover:border-[#FFD4CA]/50 transition-colors">🎤</div>
-                                    <span className="font-dm text-white/80 group-hover:text-white transition-colors">Vocalist</span>
-                                </div>
-                                <span className="font-dm text-xs text-[#FFD4CA] bg-[#FFD4CA]/10 px-2 py-1 rounded-md">24 threads</span>
-                            </div>
-                            <div className="flex justify-between items-center group cursor-pointer">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-[#131B1A] flex items-center justify-center border border-white/10 group-hover:border-[#FFD4CA]/50 transition-colors">🎸</div>
-                                    <span className="font-dm text-white/80 group-hover:text-white transition-colors">Bassist</span>
-                                </div>
-                                <span className="font-dm text-xs text-[#FFD4CA] bg-[#FFD4CA]/10 px-2 py-1 rounded-md">18 threads</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* RESTORED: THE HIGH-FIDELITY TRENDING THREADS WIDGET */}
-                    <div className="bg-[#131B1A] border border-white/5 rounded-[2rem] p-6">
-                        <h3 className="font-bebas text-xl text-white/50 tracking-widest uppercase mb-4 whitespace-nowrap">Trending Threads</h3>
-                        <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-teal-900 to-[#0A0E0D] border border-white/10 mb-4 flex flex-col justify-end p-4 relative overflow-hidden group cursor-pointer">
-                            {/* Fake Audio Waveform */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-20 group-hover:opacity-40 transition-opacity">
-                                <div className="w-1 h-12 bg-[#FFD4CA] rounded-full mx-1 animate-[pulse_1s_ease-in-out_infinite]"></div>
-                                <div className="w-1 h-24 bg-[#FFD4CA] rounded-full mx-1 animate-[pulse_1.2s_ease-in-out_infinite]"></div>
-                                <div className="w-1 h-16 bg-[#FFD4CA] rounded-full mx-1 animate-[pulse_0.8s_ease-in-out_infinite]"></div>
-                                <div className="w-1 h-8 bg-[#FFD4CA] rounded-full mx-1 animate-[pulse_1.5s_ease-in-out_infinite]"></div>
-                                <div className="w-1 h-20 bg-[#FFD4CA] rounded-full mx-1 animate-[pulse_1.1s_ease-in-out_infinite]"></div>
-                            </div>
-
-                            <div className="relative z-10 backdrop-blur-sm bg-black/40 p-3 rounded-xl border border-white/10">
-                                <h4 className="font-bebas text-2xl text-white">Neon Skyline</h4>
-                                <p className="font-dm text-xs text-[#FFD4CA]">Synthwave • 120 BPM</p>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                            <div className="flex -space-x-2">
-                                <div className="w-8 h-8 rounded-full border-2 border-[#131B1A] bg-teal-500 shadow-lg"></div>
-                                <div className="w-8 h-8 rounded-full border-2 border-[#131B1A] bg-purple-500 shadow-lg"></div>
-                                <div className="w-8 h-8 rounded-full border-2 border-[#131B1A] bg-[#FF4439] shadow-lg"></div>
-                            </div>
-                            <button className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-[0_0_15px_rgba(255,255,255,0.4)]">
-                                <svg className="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                            </button>
-                        </div>
-                    </div>
-                </aside>
+          {/* NAVBAR */}
+          <nav className="sticky top-0 z-50 bg-[#1a1a1a]/60 backdrop-blur-md border-b border-[#475B5A]/30">
+            <div className="max-w-[1100px] mx-auto px-6 h-14 flex items-center justify-between">
+              <button onClick={() => navigate('/home')} className="font-anton text-xl tracking-widest text-[#FCFCFC] uppercase hover:text-[#FF4439] transition-colors">Aalap</button>
+              <div className="flex items-center gap-3">
+                <button onClick={() => navigate('/profile')} className="w-8 h-8 rounded-full bg-[#344443] border border-[#475B5A] flex items-center justify-center font-anton text-xs text-[#FCFCFC]/50 hover:text-[#FCFCFC] hover:border-[#FFD4CA] transition-colors">
+                  {getInitial(userName)}
+                </button>
+                <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFD4CA] hover:bg-[#FCFCFC] text-[#1a1a1a] font-anton text-xs tracking-widest uppercase transition-all active:scale-95 shadow-[0_0_16px_rgba(255,212,202,0.1)]">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                  Start a Thread
+                </button>
+              </div>
             </div>
+          </nav>
+
+          <AalapHero userName={userName} />
+
+          {/* PAGE BODY */}
+          <div className="max-w-[1100px] mx-auto px-6 py-8">
+
+            {/* Search */}
+            <div className="relative mb-5">
+              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FCFCFC]/30 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search threads, creators..."
+                     className="w-full bg-[#344443]/25 backdrop-blur-sm border border-[#475B5A]/70 text-[#FCFCFC] placeholder:text-[#FCFCFC]/30 pl-10 pr-4 py-3 rounded-xl font-dm text-sm focus:outline-none focus:border-[#FFD4CA]/60 transition-colors" />
+              {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#FCFCFC]/30 hover:text-[#FCFCFC]/70 transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+              )}
+            </div>
+
+            {/* Filter pills */}
+            <div className="flex items-center gap-2 mb-8 overflow-x-auto no-scrollbar pb-1">
+              <button onClick={() => setFilterRole(null)}
+                      className={`shrink-0 px-4 py-1.5 rounded-full border font-dm text-xs tracking-wide transition-all
+                            ${filterRole === null ? 'bg-[#FCFCFC] border-[#FCFCFC] text-[#1a1a1a]' : 'bg-transparent border-[#475B5A] text-[#FCFCFC]/50 hover:text-[#FCFCFC] hover:border-[#FFD4CA]'}`}>
+                All
+              </button>
+              {ALL_ROLES.map(role => {
+                const rc  = getRoleColor(role);
+                const sel = filterRole === role;
+                return (
+                    <button key={role} onClick={() => setFilterRole(sel ? null : role)}
+                            className={`shrink-0 px-4 py-1.5 rounded-full border font-dm text-xs tracking-wide transition-all
+                                    ${sel ? `${rc.bg} ${rc.text} border-transparent` : 'bg-transparent border-[#475B5A] text-[#FCFCFC]/50 hover:text-[#FCFCFC] hover:border-[#FFD4CA]'}`}
+                            style={sel ? { borderColor: rc.dot + '60' } : {}}>
+                      {role}
+                    </button>
+                );
+              })}
+            </div>
+
+            {/* Count + clear */}
+            <div className="flex items-center justify-between mb-5">
+              <p className="font-dm text-xs text-[#FCFCFC]/30 uppercase tracking-[0.2em]">
+                {isLoading ? 'Loading...' : `${filtered.length} ${filtered.length === 1 ? 'thread' : 'threads'}`}
+              </p>
+              {filterRole && (
+                  <button onClick={() => setFilterRole(null)} className="font-dm text-xs text-[#FFD4CA]/60 hover:text-[#FFD4CA] transition-colors">
+                    Clear filter ✕
+                  </button>
+              )}
+            </div>
+
+            {/* Feed */}
+            {isLoading ? (
+                <div className="flex flex-col gap-3">
+                  {[1, 2, 3].map(i => (
+                      <div key={i} className="bg-[#344443] border border-[#475B5A] rounded-2xl p-6 animate-pulse" style={{ opacity: 1 - i * 0.15 }}>
+                        <div className="h-5 bg-[#475B5A] rounded-lg w-2/3 mb-3" />
+                        <div className="h-3 bg-[#475B5A] rounded w-full mb-2" />
+                        <div className="h-3 bg-[#475B5A] rounded w-4/5 mb-5" />
+                        <div className="flex gap-2">
+                          <div className="h-6 w-20 bg-[#475B5A] rounded-full" />
+                          <div className="h-6 w-16 bg-[#475B5A] rounded-full" />
+                        </div>
+                      </div>
+                  ))}
+                </div>
+            ) : filtered.length === 0 ? (
+                <div className="py-24 text-center">
+                  <p className="font-dm text-[#FCFCFC]/30 text-base">
+                    {search || filterRole ? 'No threads match your search.' : 'No threads yet. Be the first.'}
+                  </p>
+                  {!search && !filterRole && (
+                      <button onClick={() => setModalOpen(true)} className="mt-5 font-anton text-sm tracking-widest uppercase text-[#FF4439] border border-[#FF4439]/30 px-6 py-3 rounded-xl hover:bg-[#FF4439]/10 transition-colors">
+                        Start the first thread
+                      </button>
+                  )}
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {filtered.map((thread, i) => (
+                      <ThreadCard key={thread.id} thread={thread} index={i}
+                                  onClick={() => navigate(`/threads/${thread.id}`)}
+                                  onCreatorClick={() => navigate(`/users/${thread.createdBy.id}`)} />
+                  ))}
+                </div>
+            )}
+          </div>
+        </div> {/* end z-10 content wrapper */}
+      </div>
+  );
+}
+
+// ─── AALAP HERO ───────────────────────────────────────────────────────────────
+
+const THREAD_NODES = [
+  { role: 'Composer',        color: '#FFD4CA', cx: '14%', label: 'Composer'        },
+  { role: 'Lyricist',        color: '#FF4439', cx: '32%', label: 'Lyricist'        },
+  { role: 'Singer',          color: '#B72F30', cx: '51%', label: 'Singer'          },
+  { role: 'Producer',        color: '#FCFCFC', cx: '70%', label: 'Producer'        },
+  { role: 'Instrumentalist', color: '#475B5A', cx: '88%', label: 'Instrumentalist' },
+];
+
+function AalapHero({ userName }: { userName: string }) {
+  const [isFirstVisit, setIsFirstVisit] = useState(false);
+
+  useEffect(() => {
+    if (!sessionStorage.getItem('aalapHeroAnimated')) {
+      setIsFirstVisit(true);
+      sessionStorage.setItem('aalapHeroAnimated', 'true');
+    }
+  }, []);
+
+  return (
+      <div className="max-w-[1100px] mx-auto px-6 pt-10 pb-4 select-none">
+        <div className="mb-6">
+          <p className="font-dm text-[11px] text-[#FFD4CA]/60 uppercase tracking-[0.3em] mb-2 animate-[label-rise_0.4s_ease-out_both]" style={{ animationDelay: '0s' }}>
+            ACCESS GRANTED
+          </p>
+          <h1 className="font-anton text-[2.2rem] leading-none tracking-wide text-[#FCFCFC] uppercase">
+            <span className="animate-[toast-up_0.5s_ease-out_0.2s_both] block">HELLO, {userName}</span>
+            <span className="text-[#475B5A] animate-[toast-up_0.5s_ease-out_0.6s_both] block mt-1">
+              THE FLOOR IS YOURS.
+            </span>
+          </h1>
         </div>
-    );
+
+        <div className="relative w-full h-[88px] overflow-visible">
+          <svg viewBox="0 0 800 88" preserveAspectRatio="none" className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="neon-glow" x="-50%" y="-200%" width="200%" height="500%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur1" />
+                <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur2" />
+                <feMerge>
+                  <feMergeNode in="blur2" />
+                  <feMergeNode in="blur1" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+
+              <linearGradient id="energy-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#FF4439" stopOpacity="0" />
+                <stop offset="20%" stopColor="#FF4439" stopOpacity="1" />
+                <stop offset="80%" stopColor="#FFD4CA" stopOpacity="1" />
+                <stop offset="100%" stopColor="#FFD4CA" stopOpacity="0" />
+              </linearGradient>
+
+              {THREAD_NODES.map(n => (
+                  <filter key={n.role} id={`glow-${n.role}`} x="-100%" y="-100%" width="300%" height="300%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+              ))}
+            </defs>
+
+            <path d="M -10,44 C 80,44 100,24 160,44 S 260,64 320,44 S 420,24 480,44 S 580,64 640,44 S 740,24 810,44"
+                  fill="none" stroke="rgba(252,252,252,0.05)" strokeWidth="1" />
+
+            <path d="M -10,44 C 80,44 100,24 160,44 S 260,64 320,44 S 420,24 480,44 S 580,64 640,44 S 740,24 810,44"
+                  fill="none" stroke="rgba(255,68,57,0.3)" strokeWidth="3" strokeDasharray="1400" strokeDashoffset="1400" strokeLinecap="round"
+                  filter="url(#neon-glow)"
+                  style={isFirstVisit
+                      ? { animation: 'thread-draw 2.5s cubic-bezier(0.4,0,0.2,1) 0.3s forwards, thread-breathe 4s ease-in-out 3s infinite' }
+                      : { strokeDashoffset: 0, animation: 'thread-breathe 4s ease-in-out infinite' }} />
+
+            <path d="M -10,44 C 80,44 100,24 160,44 S 260,64 320,44 S 420,24 480,44 S 580,64 640,44 S 740,24 810,44"
+                  fill="none" stroke="url(#energy-grad)" strokeWidth="2.5" strokeDasharray="15 35 5 45" strokeLinecap="round"
+                  filter="url(#neon-glow)"
+                  style={isFirstVisit
+                      ? { opacity: 0, animation: 'toast-up 1s ease-out 2.5s forwards, thread-flow-hero 1s linear infinite' }
+                      : { opacity: 1, animation: 'thread-flow-hero 1s linear infinite' }} />
+
+            {THREAD_NODES.map((node, i) => (
+                <g key={node.role}>
+                  <circle cx={node.cx} cy="44" r="12" fill="none" stroke={node.color} opacity="0"
+                          style={isFirstVisit
+                              ? { animation: `energy-ripple 2.5s ease-out ${1.5 + i * 0.45}s infinite`, transformOrigin: `${node.cx} 44px`, transformBox: 'fill-box' }
+                              : { animation: `energy-ripple 2.5s ease-out ${i * 0.45}s infinite`, transformOrigin: `${node.cx} 44px`, transformBox: 'fill-box' }} />
+
+                  <circle cx={node.cx} cy="44" r="5" fill={node.color} opacity={isFirstVisit ? 0 : 1} filter={`url(#glow-${node.role})`}
+                          style={isFirstVisit
+                              ? { animation: `node-appear 0.5s ease-out ${0.8 + i * 0.45}s forwards, core-pulse 2.5s ease-in-out ${1.5 + i * 0.45}s infinite`, transformOrigin: `${node.cx} 44px`, transformBox: 'fill-box' }
+                              : { animation: `core-pulse 2.5s ease-in-out ${i * 0.45}s infinite`, transformOrigin: `${node.cx} 44px`, transformBox: 'fill-box' }} />
+                </g>
+            ))}
+          </svg>
+
+          <div className="absolute inset-0 flex items-end pb-0 pointer-events-none">
+            {THREAD_NODES.map((node, i) => (
+                <div key={node.role} className="absolute flex flex-col items-center"
+                     style={isFirstVisit
+                         ? { left: node.cx, transform: 'translateX(-50%)', bottom: 0, opacity: 0, animation: `label-rise 0.4s ease-out ${1.1 + i * 0.45}s forwards` }
+                         : { left: node.cx, transform: 'translateX(-50%)', bottom: 0, opacity: 1 }}>
+                            <span className="font-dm text-[9px] uppercase tracking-[0.15em] whitespace-nowrap drop-shadow-md" style={{ color: node.color }}>
+                                {node.label}
+                            </span>
+                </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 h-px bg-gradient-to-r from-transparent via-[#475B5A]/50 to-transparent" />
+      </div>
+  );
+}
+
+// ─── THREAD CARD ──────────────────────────────────────────────────────────────
+
+interface ThreadCardProps {
+  thread: ThreadSummary;
+  index: number;
+  onClick: () => void;
+  onCreatorClick: (e: React.MouseEvent) => void;
+}
+
+function ThreadCard({ thread, index, onClick, onCreatorClick }: ThreadCardProps) {
+  const contributorNodes = Object.entries(thread.rolesWithContributors).flatMap(
+      ([role, names]) => names.map(name => ({ role, name }))
+  );
+  const hasContributors = contributorNodes.length > 0;
+
+  return (
+      <div
+          className="group relative bg-[#344443]/25 backdrop-blur-sm border border-[#475B5A]/70 rounded-2xl p-6
+                cursor-pointer transition-all duration-300 ease-out
+                hover:border-[#FF4439]/50 hover:bg-[#344443]/40 hover:shadow-[0_8px_30px_rgba(255,68,57,0.06)]
+                hover:-translate-y-0.5 overflow-hidden animate-[card-in_0.4s_ease-out_both]"
+          style={{ animationDelay: `${index * 50}ms` }}
+          onClick={onClick}
+      >
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#FF4439] scale-y-0 opacity-0 group-hover:scale-y-100 group-hover:opacity-100 transition-all duration-300 origin-bottom" />
+
+        <div className="flex flex-col gap-4">
+
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="font-anton text-2xl tracking-wide text-[#FCFCFC]/90 uppercase leading-none group-hover:text-[#FCFCFC] transition-colors">
+              {thread.title}
+            </h2>
+            <span className="shrink-0 font-dm text-[10px] text-[#FFD4CA]/50 uppercase tracking-widest mt-1">
+                        {timeAgo(thread.createdAt)}
+                    </span>
+          </div>
+
+          {thread.description && (
+              <p className="font-dm text-sm text-[#FCFCFC]/60 leading-relaxed line-clamp-2 -mt-1">
+                {thread.description}
+              </p>
+          )}
+
+          {hasContributors ? (
+              <div className="relative pt-1 pb-1">
+                <p className="font-dm text-[9px] text-[#FFD4CA]/50 uppercase tracking-[0.2em] mb-3">
+                  Woven by
+                </p>
+
+                <div className="relative flex items-start gap-0 overflow-x-auto no-scrollbar">
+                  {contributorNodes.map((contributor, i) => {
+                    const rc = getRoleColor(contributor.role);
+                    const isLast = i === contributorNodes.length - 1;
+                    return (
+                        <div key={`${contributor.role}-${contributor.name}-${i}`} className="flex items-start shrink-0">
+                          <div className="flex flex-col items-center gap-1.5 w-[72px]">
+                            <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center font-anton text-[13px] transition-transform group-hover:scale-105"
+                                style={{
+                                  backgroundColor: rc.dot + '18',
+                                  border: `1.5px solid ${rc.dot}55`,
+                                  color: rc.dot,
+                                  boxShadow: `0 0 10px ${rc.dot}22`,
+                                }}
+                            >
+                              {getInitial(contributor.name)}
+                            </div>
+                            <span
+                                className="font-dm text-[10px] text-[#FCFCFC]/70 text-center leading-tight max-w-[68px] truncate"
+                                title={contributor.name}
+                            >
+                                                {contributor.name}
+                                            </span>
+                            <span
+                                className={`font-dm text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded ${rc.bg} ${rc.text} whitespace-nowrap`}
+                            >
+                                                {contributor.role.split(' - ')[0]}
+                                            </span>
+                          </div>
+
+                          {!isLast && (
+                              <div className="flex items-center self-start mt-[15px] mx-0.5">
+                                <div className="flex items-center gap-[3px]">
+                                  <span className="block w-[6px] h-[1.5px] rounded-full" style={{ backgroundColor: rc.dot + '50' }} />
+                                  <span className="block w-[3px] h-[1.5px] rounded-full" style={{ backgroundColor: rc.dot + '30' }} />
+                                  <span className="block w-[6px] h-[1.5px] rounded-full"
+                                        style={{ backgroundColor: getRoleColor(contributorNodes[i + 1]?.role ?? '').dot + '50' }} />
+                                </div>
+                              </div>
+                          )}
+                        </div>
+                    );
+                  })}
+                </div>
+              </div>
+          ) : (
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#475B5A]" />
+                <span className="font-dm text-[10px] text-[#FCFCFC]/40 uppercase tracking-wider">
+                            Seed planted — awaiting first voice
+                        </span>
+              </div>
+          )}
+
+          <div className="flex items-center justify-between mt-1 pt-4 border-t border-[#475B5A]/50">
+            <button
+                onClick={e => { e.stopPropagation(); onCreatorClick(e); }}
+                className="flex items-center gap-2.5 group/creator transition-transform active:scale-95"
+            >
+              <div className="w-7 h-7 rounded-full bg-[#1a1a1a]/50 border border-[#475B5A]
+                            flex items-center justify-center font-anton text-[11px] text-[#FCFCFC]/60
+                            group-hover/creator:border-[#FF4439]/60 group-hover/creator:text-[#FF4439]
+                            group-hover/creator:bg-[#FF4439]/10 transition-all shadow-inner">
+                {getInitial(thread.createdBy.name)}
+              </div>
+              <div className="flex flex-col items-start">
+                <span className="font-dm text-[10px] text-[#FFD4CA]/50 uppercase tracking-widest leading-none mb-1">Started by</span>
+                <span className="font-dm text-xs text-[#FCFCFC]/80 group-hover/creator:text-[#FF4439] transition-colors leading-none">
+                                {thread.createdBy.name}
+                            </span>
+              </div>
+            </button>
+
+            <div className="flex items-center gap-2 bg-[#1a1a1a]/30 border border-[#475B5A]/50 pl-3 pr-1.5 py-1.5 rounded-lg group-hover:border-[#475B5A] transition-colors">
+                        <span className="font-dm text-[11px] text-[#FCFCFC]/50 uppercase tracking-widest">
+                            Stems
+                        </span>
+              <span className="bg-[#475B5A]/50 text-[#FCFCFC] font-dm text-xs font-medium px-2 py-0.5 rounded flex items-center justify-center min-w-[24px]">
+                            {thread.contributionCount}
+                        </span>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
 }

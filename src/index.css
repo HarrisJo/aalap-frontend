@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+html, body, #root {
+    background-color: #060808; /* Matches your app's dark theme */
+    color: #FCFCFC;
+    min-height: 100vh;
+    margin: 0;
+}
