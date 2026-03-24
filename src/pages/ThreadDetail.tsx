@@ -114,7 +114,7 @@ export default function ThreadDetailPage() {
         if (!token) { navigate('/auth'); return; }
         try {
             const res = await axios.get(
-                `https://aalap-backend-1.onrender.com/api/threads/${id}`,
+                `${import.meta.env.VITE_API_URL}/api/threads/${id}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setThread(res.data);
@@ -158,20 +158,36 @@ export default function ThreadDetailPage() {
     const handleAddContribution = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!contribFile || !contribRole) { showToast('Choose a role and a file first.', 'error'); return; }
+
         let finalRole = contribRole;
         if (contribRole === 'Instrumentalist' && contribInstrument.trim()) finalRole = `Instrumentalist - ${contribInstrument.trim()}`;
+
         const isComposer = contribRole === 'Composer';
         setIsUploading(true);
+
         try {
             await ThreadService.addContribution(Number(id), finalRole, contribDescription, contribFile,
                 isComposer ? Number(contribBpm) : undefined, isComposer ? contribKey : undefined);
+
             setModalOpen(false);
             setContribRole(''); setContribInstrument(''); setContribDescription('');
             setContribFile(null); setContribBpm(''); setContribKey('');
             showToast('Your stem is in the mix.', 'success');
             await fetchThread();
-        } catch (err: any) { showToast(err?.response?.data || 'Upload failed.', 'error'); }
-        finally { setIsUploading(false); }
+
+        } catch (err) {
+            // 🛑 NO MORE 'any'! Safe TypeScript checking for Axios errors
+            if (axios.isAxiosError(err)) {
+                // Safely grab the message from our new Spring Boot ErrorResponse DTO,
+                // or fallback to the raw data if it's a string.
+                const errorMessage = err.response?.data?.message || err.response?.data || 'Upload failed.';
+                showToast(typeof errorMessage === 'string' ? errorMessage : 'Upload failed.', 'error');
+            } else {
+                showToast('An unexpected error occurred.', 'error');
+            }
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     const handleMasterUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -107,7 +107,7 @@ export default function HomeFeed() {
     const token = localStorage.getItem('token');
     if (!token) { navigate('/auth'); return; }
     try {
-      const res = await axios.get('https://aalap-backend-1.onrender.com/api/threads', {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/threads`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setThreads(res.data);

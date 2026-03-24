@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { AuthService } from '../services/AuthService';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import axios from 'axios';
 
 // ─── BACKGROUND CANVAS ────────────────────────────────────────────────────────
 
@@ -444,8 +446,13 @@ export default function AuthPage() {
             const data = await AuthService.login(loginEmail, loginPassword);
             localStorage.setItem('token', data.token);
             navigate('/home');
-        } catch (error: any) {
-            alert(error.response?.data?.message || 'Login failed. Check your connection.');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const message = error.response?.data?.message || 'Login failed. Check your connection.';
+                toast.error(message);
+            } else {
+                toast.error('An unexpected error occurred');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -458,8 +465,13 @@ export default function AuthPage() {
             const data = await AuthService.register(regName, regEmail, regPassword);
             localStorage.setItem('token', data.token);
             navigate('/home');
-        } catch (error: any) {
-            alert(error.response?.data?.message || 'Registration failed. Name or Email might be taken.');
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                const message = error.response?.data?.message || 'Registration failed. Name or Email might be taken.';
+                toast.error(message);
+            } else {
+                toast.error('An unexpected error occurred');
+            }
         } finally {
             setIsLoading(false);
         }

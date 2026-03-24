@@ -290,7 +290,7 @@ export default function ProfilePage() {
 
         try {
             // Hit the new optimized VIP endpoint
-            const res = await axios.get('https://aalap-backend-1.onrender.com/api/users/me', {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 

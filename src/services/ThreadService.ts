@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'https://aalap-backend-1.onrender.com/api/threads';
+// We add the /api/threads right here!
+const API_URL = `${import.meta.env.VITE_API_URL}/api/threads`;
 
 const getAuthHeader = () => {
     const token = localStorage.getItem('token');
@@ -43,27 +44,19 @@ export const ThreadService = {
         return response.data;
     },
 
-    // ─── DELETE CONTRIBUTION ─────────────────────────────────────────────────────
-    // Deletes the contribution from DB and its file from Cloudinary.
-    // The backend will reject with 403 if the logged-in user doesn't own it.
-
     deleteContribution: async (contributionId: number) => {
         await axios.delete(
-            `https://aalap-backend-1.onrender.com/api/threads/contributions/${contributionId}`,
+            `${API_URL}/contributions/${contributionId}`,
             { headers: getAuthHeader() }
         );
     },
-
-    // ─── REUPLOAD CONTRIBUTION FILE ───────────────────────────────────────────────
-    // Replaces only the audio file. Role and description are unchanged.
-    // The backend will reject with 403 if the logged-in user doesn't own it.
 
     reuploadContributionFile: async (contributionId: number, file: File) => {
         const formData = new FormData();
         formData.append('file', file);
 
         const response = await axios.put(
-            `https://aalap-backend-1.onrender.com/api/threads/contributions/${contributionId}/file`,
+            `${API_URL}/contributions/${contributionId}/file`,
             formData,
             { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } }
         );

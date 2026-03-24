@@ -159,7 +159,7 @@ export default function PublicProfilePage() {
         if (!token) { navigate('/auth'); return; }
 
         try {
-            const res = await axios.get(`https://aalap-backend-1.onrender.com/api/users/${id}`, {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
