@@ -261,7 +261,7 @@ export default function HomeFeed() {
                             <input
                                 type="text" required autoFocus
                                 value={newTitle} onChange={e => setNewTitle(e.target.value)}
-                                placeholder="e.g. Midnight Melody"
+                                placeholder="e.g. Why this kolaveri?"
                                 className="w-full bg-[#FCFCFC]/[0.03] border border-[#FCFCFC]/10
                                        text-[#FCFCFC] placeholder:text-[#FCFCFC]/15
                                        px-5 py-4 rounded-2xl font-dm text-base
@@ -285,7 +285,7 @@ export default function HomeFeed() {
                           <textarea
                               rows={3}
                               value={newDescription} onChange={e => setNewDescription(e.target.value)}
-                              placeholder="What's the vibe? Genre, mood, key, BPM..."
+                              placeholder="A song for soup boys..."
                               className="w-full bg-[#FCFCFC]/[0.03] border border-[#FCFCFC]/10
                                        text-[#FCFCFC] placeholder:text-[#FCFCFC]/15
                                        px-5 py-4 rounded-2xl font-dm text-sm
