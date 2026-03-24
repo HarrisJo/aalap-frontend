@@ -70,7 +70,7 @@ function FloatingPaper({ delay = '0s' }: { delay?: string }) {
           <div style={{ animation: 'ink-fade-in 0.5s ease-out 1.4s both' }}>
             <p className="font-caveat text-[14px] text-[#7a6a4a] leading-none mb-0.5">key</p>
             <p className="font-caveat leading-none" style={{ fontSize: 34, color: '#2a2010', fontWeight: 600, textShadow: '0.5px 0.5px 0 rgba(0,0,0,0.1)' }}>
-              C Minor
+              A Minor
             </p>
           </div>
         </div>
