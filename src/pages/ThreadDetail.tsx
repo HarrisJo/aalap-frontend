@@ -91,6 +91,9 @@ export default function ThreadDetailPage() {
     const [isUploading, setIsUploading]                 = useState(false);
     const [isUploadingMaster, setIsUploadingMaster]     = useState(false);
 
+    const [confirmingDeleteThread, setConfirmingDeleteThread] = useState(false);
+    const [isDeletingThread, setIsDeletingThread]             = useState(false);
+
     // Decode JWT once on mount to know who is logged in
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -215,6 +218,20 @@ export default function ThreadDetailPage() {
             await fetchThread();
         } catch {
             showToast('Reupload failed. Try again.', 'error');
+        }
+    };
+
+    const handleDeleteThread = async () => {
+        setIsDeletingThread(true);
+        try {
+            await ThreadService.deleteThread(Number(id));
+            showToast('Session deleted.', 'success');
+            // Small delay so the toast is visible before navigating away
+            setTimeout(() => navigate('/home'), 1200);
+        } catch {
+            showToast('Could not delete session. Try again.', 'error');
+            setIsDeletingThread(false);
+            setConfirmingDeleteThread(false);
         }
     };
 
@@ -423,27 +440,71 @@ export default function ThreadDetailPage() {
                         </svg>
                         Feed
                     </button>
-                    <div className="flex items-center gap-1.5 text-white/20 font-dm text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#FF4439]/60 animate-pulse shrink-0" />
-                        <span>Last updated</span>
-                        <span className="text-white/35">
-                            {contributions.length > 0
-                                ? (() => {
-                                    const latest = contributions.reduce((a, b) =>
-                                        new Date(a.createdAt) > new Date(b.createdAt) ? a : b
-                                    );
-                                    const diff = Date.now() - new Date(latest.createdAt).getTime();
-                                    const mins  = Math.floor(diff / 60000);
-                                    const hours = Math.floor(diff / 3600000);
-                                    const days  = Math.floor(diff / 86400000);
-                                    if (mins < 60)  return `${mins}m ago`;
-                                    if (hours < 24) return `${hours}h ago`;
-                                    if (days < 7)   return `${days}d ago`;
-                                    return new Date(latest.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                })()
-                                : formatDate(thread.createdAt)
-                            }
+
+                    <div className="flex items-center gap-4">
+
+                        {/* Last updated label */}
+                        <div className="flex items-center gap-1.5 text-white/20 font-dm text-[11px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#FF4439]/60 animate-pulse shrink-0" />
+                            <span>Last updated</span>
+                            <span className="text-white/35">
+                    {contributions.length > 0
+                        ? (() => {
+                            const latest = contributions.reduce((a, b) =>
+                                new Date(a.createdAt) > new Date(b.createdAt) ? a : b
+                            );
+                            const diff = Date.now() - new Date(latest.createdAt).getTime();
+                            const mins  = Math.floor(diff / 60000);
+                            const hours = Math.floor(diff / 3600000);
+                            const days  = Math.floor(diff / 86400000);
+                            if (mins < 60)  return `${mins}m ago`;
+                            if (hours < 24) return `${hours}h ago`;
+                            if (days < 7)   return `${days}d ago`;
+                            return new Date(latest.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        })()
+                        : formatDate(thread.createdAt)
+                    }
+                </span>
+                        </div>
+
+                        {/* Delete thread button — only visible to the thread creator */}
+                        {loggedInEmail !== null && thread.createdBy?.email === loggedInEmail && (
+                            !confirmingDeleteThread ? (
+                                <button
+                                    title="Delete this session"
+                                    onClick={() => setConfirmingDeleteThread(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] text-white/25 hover:text-[#FF4439]/80 hover:border-[#FF4439]/30 hover:bg-[#FF4439]/5 font-dm text-xs transition-all"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    Delete Session
+                                </button>
+                            ) : (
+                                /* Inline confirm — same pattern as contribution delete */
+                                <div className="flex items-center gap-2 bg-[#1a0808]/90 border border-[#FF4439]/30 rounded-lg px-3 py-1.5 animate-[modal-in_0.15s_ease-out]">
+                        <span className="font-dm text-xs text-white/40 whitespace-nowrap">
+                            {isDeletingThread ? 'Deleting...' : 'Delete entire session?'}
                         </span>
+                                    {!isDeletingThread && (
+                                        <>
+                                            <button
+                                                onClick={handleDeleteThread}
+                                                className="font-dm text-xs text-[#FF4439] hover:text-[#FF4439]/80 font-medium px-1 transition-colors"
+                                            >
+                                                Yes
+                                            </button>
+                                            <button
+                                                onClick={() => setConfirmingDeleteThread(false)}
+                                                className="font-dm text-xs text-white/30 hover:text-white/60 px-1 transition-colors"
+                                            >
+                                                No
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
             </nav>

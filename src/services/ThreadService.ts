@@ -73,10 +73,17 @@ export const ThreadService = {
         const formData = new FormData();
         formData.append('file', file);
 
-        // ✅ FIX: Same fix applied here too.
         const response = await axios.post(`${API_URL}/${threadId}/master`, formData, {
             headers: { ...getAuthHeader() }
         });
         return response.data;
+    },
+
+    // ─── DELETE THREAD ────────────────────────────────────────────────────────
+    // Only callable by the thread creator. Deletes the thread and all its
+    // contributions from both Cloudinary and the database.
+
+    deleteThread: async (threadId: number) => {
+        await axios.delete(`${API_URL}/${threadId}`, { headers: getAuthHeader() });
     },
 };
