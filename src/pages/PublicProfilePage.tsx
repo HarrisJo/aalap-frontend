@@ -188,7 +188,6 @@ export default function PublicProfilePage() {
     const countCollabs = useCountUp(isLoading ? 0 : uniqueCollaborators,  1100, 900);
 
     const initial   = getInitial(userName);
-    const nameChars = userName === '?' ? [] : userName.split('');
 
     return (
         <div className="min-h-screen bg-[#060808] text-[#FCFCFC] overflow-x-hidden">
