@@ -4,6 +4,18 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
+// ─── HOOK: responsive breakpoint ─────────────────────────────────────────────
+
+function useIsMobile(breakpoint = 768) {
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+    useEffect(() => {
+        const handler = () => setIsMobile(window.innerWidth < breakpoint);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+    }, [breakpoint]);
+    return isMobile;
+}
+
 // ─── BACKGROUND CANVAS ────────────────────────────────────────────────────────
 
 function StudioCanvas() {
@@ -31,7 +43,6 @@ function StudioCanvas() {
         };
         window.addEventListener('mousemove', onMouse);
 
-        // Particles
         const PARTICLE_COUNT = 55;
         interface Particle { x: number; y: number; r: number; vx: number; vy: number; opacity: number; pulse: number; }
         const particles: Particle[] = Array.from({ length: PARTICLE_COUNT }, () => ({
@@ -61,7 +72,6 @@ function StudioCanvas() {
 
             ctx.clearRect(0, 0, W, H);
 
-            // Base bg
             const bg = ctx.createLinearGradient(0, 0, W, H);
             bg.addColorStop(0,   '#070B0A');
             bg.addColorStop(0.5, '#0A0F0E');
@@ -69,7 +79,6 @@ function StudioCanvas() {
             ctx.fillStyle = bg;
             ctx.fillRect(0, 0, W, H);
 
-            // Mouse-reactive glow
             const mx = mouseRef.current.x * W;
             const my = mouseRef.current.y * H;
             const glow = ctx.createRadialGradient(mx, my, 0, mx, my, 380);
@@ -79,7 +88,6 @@ function StudioCanvas() {
             ctx.fillStyle = glow;
             ctx.fillRect(0, 0, W, H);
 
-            // Corner ambients
             const tl = ctx.createRadialGradient(0, 0, 0, 0, 0, 500);
             tl.addColorStop(0, 'rgba(255,68,57,0.07)');
             tl.addColorStop(1, 'transparent');
@@ -92,13 +100,11 @@ function StudioCanvas() {
             ctx.fillStyle = br;
             ctx.fillRect(0, 0, W, H);
 
-            // Scan lines texture
             ctx.fillStyle = 'rgba(255,255,255,0.012)';
             for (let y = 0; y < H; y += 3) {
                 ctx.fillRect(0, y, W, 0.5);
             }
 
-            // Flowing wave layers
             const waveBaseY = H * 0.72;
             WAVES.forEach((wave) => {
                 ctx.beginPath();
@@ -115,7 +121,6 @@ function StudioCanvas() {
                 ctx.stroke();
             });
 
-            // EQ bars at bottom
             const barCount = 80;
             const barW     = W / barCount;
             for (let i = 0; i < barCount; i++) {
@@ -127,7 +132,6 @@ function StudioCanvas() {
                 ctx.fillRect(i * barW, H - height, barW - 1, height);
             }
 
-            // Particle connections
             for (let i = 0; i < particles.length; i++) {
                 for (let j = i + 1; j < particles.length; j++) {
                     const dx   = particles[i].x - particles[j].x;
@@ -145,7 +149,6 @@ function StudioCanvas() {
                 }
             }
 
-            // Particles
             particles.forEach(p => {
                 p.x += p.vx;
                 p.y += p.vy;
@@ -160,7 +163,6 @@ function StudioCanvas() {
                 ctx.fill();
             });
 
-            // Vignette
             const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.9);
             vig.addColorStop(0, 'transparent');
             vig.addColorStop(1, 'rgba(4,7,6,0.72)');
@@ -201,7 +203,6 @@ function CoverWaveform() {
             const cx = W / 2, cy = H / 2;
             ctx.clearRect(0, 0, W, H);
 
-            // Outer static rings
             [130, 155, 175].forEach((r, i) => {
                 ctx.beginPath();
                 ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -210,7 +211,6 @@ function CoverWaveform() {
                 ctx.stroke();
             });
 
-            // Animated frequency bars ring
             const BARS = 72;
             for (let i = 0; i < BARS; i++) {
                 const angle  = (i / BARS) * Math.PI * 2 - Math.PI / 2;
@@ -235,7 +235,6 @@ function CoverWaveform() {
                 ctx.stroke();
             }
 
-            // Inner wobbling sine ring
             ctx.beginPath();
             for (let i = 0; i <= 360; i++) {
                 const angle  = (i / 360) * Math.PI * 2;
@@ -250,7 +249,6 @@ function CoverWaveform() {
             ctx.lineWidth   = 1;
             ctx.stroke();
 
-            // Center glow
             const coreR    = 28 + 3 * Math.sin(t * 2.5);
             const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2.5);
             coreGlow.addColorStop(0,   `rgba(255,68,57,${0.6 + 0.2 * Math.sin(t * 2)})`);
@@ -266,7 +264,6 @@ function CoverWaveform() {
             ctx.fillStyle = '#FF4439';
             ctx.fill();
 
-            // Ripple rings
             const rp = (t * 0.5) % 1;
             [0, 0.33, 0.66].forEach(offset => {
                 const progress = ((rp + offset) % 1);
@@ -387,7 +384,7 @@ function SubmitButton({ isLoading, label, loadingLabel }: { isLoading: boolean; 
                 background:    hovered ? 'linear-gradient(90deg, #FF4439, #B72F30)' : 'rgba(255,68,57,0.08)',
                 border:        `1px solid ${hovered ? '#FF4439' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius:  '999px',
-                padding:       '12px 0',
+                padding:       '14px 0',
                 cursor:        isLoading ? 'not-allowed' : 'pointer',
                 opacity:       isLoading ? 0.65 : 1,
                 transition:    'all 0.35s ease',
@@ -397,16 +394,16 @@ function SubmitButton({ isLoading, label, loadingLabel }: { isLoading: boolean; 
             }}
         >
             <span style={{
-                display:       'flex',
-                alignItems:    'center',
-                justifyContent:'center',
-                gap:           '8px',
-                fontFamily:    "'DM Sans', sans-serif",
-                fontSize:      '11px',
-                fontWeight:    700,
-                letterSpacing: '0.25em',
-                textTransform: 'uppercase' as const,
-                color:         '#FCFCFC',
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                gap:            '8px',
+                fontFamily:     "'DM Sans', sans-serif",
+                fontSize:       '11px',
+                fontWeight:     700,
+                letterSpacing:  '0.25em',
+                textTransform:  'uppercase' as const,
+                color:          '#FCFCFC',
             }}>
                 {isLoading ? (
                     <>
@@ -425,7 +422,8 @@ function SubmitButton({ isLoading, label, loadingLabel }: { isLoading: boolean; 
 // ─── MAIN AUTH PAGE ───────────────────────────────────────────────────────────
 
 export default function AuthPage() {
-    const navigate = useNavigate();
+    const navigate  = useNavigate();
+    const isMobile  = useIsMobile(768);
 
     const [isLogin,   setIsLogin]   = useState(true);
     const [isLoading, setIsLoading] = useState(false);
@@ -501,332 +499,574 @@ export default function AuthPage() {
                 .cover-panel {
                     transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
                 }
+                /* Tap highlight reset on mobile */
+                button { -webkit-tap-highlight-color: transparent; }
             `}</style>
 
             {/* Animated canvas background */}
             <StudioCanvas />
 
-            {/* Main layout */}
-            <div style={{
-                position:       'relative',
-                zIndex:         10,
-                minHeight:      '100vh',
-                display:        'flex',
-                flexDirection:  'column',
-                alignItems:     'center',
-                justifyContent: 'center',
-                padding:        '16px',
-                fontFamily:     "'DM Sans', sans-serif",
-            }}>
-
-                {/* Top wordmark */}
-                <div style={{
-                    marginBottom: '28px',
-                    textAlign:    'center',
-                    animation:    'wordmark-in 0.9s cubic-bezier(0.16,1,0.3,1) both',
-                }}>
-                    <span style={{
-                        fontFamily:    "'Bebas Neue', sans-serif",
-                        fontSize:      '13px',
-                        letterSpacing: '0.55em',
-                        color:         'rgba(255,212,202,0.35)',
-                    }}>
-                        ◆ &nbsp; AALAP STUDIO &nbsp; ◆
-                    </span>
-                </div>
-
-                {/* Card */}
+            {/* ── MOBILE LAYOUT ── */}
+            {isMobile ? (
                 <div style={{
                     position:       'relative',
-                    width:          '100%',
-                    maxWidth:       '920px',
-                    height:         '540px',
-                    borderRadius:   '28px',
-                    background:     'rgba(8,12,11,0.85)',
-                    backdropFilter: 'blur(36px)',
-                    WebkitBackdropFilter: 'blur(36px)',
-                    border:         '1px solid rgba(255,255,255,0.07)',
-                    boxShadow:      '0 0 0 1px rgba(255,255,255,0.03), 0 48px 96px rgba(0,0,0,0.65), 0 0 140px rgba(255,68,57,0.07)',
-                    overflow:       'hidden',
-                    animation:      'auth-fade-up 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s both',
+                    zIndex:         10,
+                    minHeight:      '100vh',
+                    display:        'flex',
+                    flexDirection:  'column',
+                    alignItems:     'center',
+                    justifyContent: 'flex-start',
+                    padding:        '48px 20px 40px',
+                    fontFamily:     "'DM Sans', sans-serif",
+                    overflowY:      'auto',
                 }}>
-
-                    {/* Top accent bar */}
+                    {/* Top wordmark */}
                     <div style={{
-                        position:   'absolute',
-                        top:        0, left: 0, right: 0,
-                        height:     '1.5px',
-                        background: 'linear-gradient(90deg, transparent 0%, #FF4439 25%, #FFD4CA 65%, #475B5A 100%)',
-                        zIndex:     1,
-                    }} />
-
-                    {/* ── LOGIN PANEL ── */}
-                    <div style={{
-                        position:    'absolute',
-                        left: 0, top: 0,
-                        width:       '50%',
-                        height:      '100%',
-                        display:     'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        padding:     '40px 52px',
-                        borderRight: '1px solid rgba(255,255,255,0.04)',
+                        marginBottom: '28px',
+                        textAlign:    'center',
+                        animation:    'wordmark-in 0.9s cubic-bezier(0.16,1,0.3,1) both',
                     }}>
-                        <div style={{ marginBottom: '36px' }}>
-                            <p style={{
-                                fontFamily:    "'Bebas Neue', sans-serif",
-                                fontSize:      '11px',
-                                letterSpacing: '0.35em',
-                                color:         'rgba(255,68,57,0.6)',
-                                marginBottom:  '8px',
-                            }}>
-                                01 — SIGN IN
-                            </p>
-                            <h1 style={{
-                                fontFamily:    "'Bebas Neue', sans-serif",
-                                fontSize:      '54px',
-                                letterSpacing: '0.04em',
-                                color:         '#FCFCFC',
-                                lineHeight:    1,
-                                marginBottom:  '8px',
-                            }}>
-                                Welcome Back
-                            </h1>
-                            <p style={{
-                                fontFamily: "'Cormorant Garamond', serif",
-                                fontStyle:  'italic',
-                                fontSize:   '16px',
-                                color:      'rgba(255,212,202,0.5)',
-                            }}>
-                                Your threads are waiting.
-                            </p>
-                        </div>
-
-                        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', maxWidth: '300px' }}>
-                            <FloatInput label="Email Address" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="you@example.com" required />
-                            <FloatInput
-                                label="Password" type={showLoginPwd ? 'text' : 'password'}
-                                value={loginPassword} onChange={setLoginPassword}
-                                placeholder="••••••••" required
-                                rightEl={<EyeToggle visible={showLoginPwd} onToggle={() => setShowLoginPwd(v => !v)} />}
-                            />
-                            <SubmitButton isLoading={isLoading} label="Enter Studio" loadingLabel="Syncing..." />
-                        </form>
+                        <span style={{
+                            fontFamily:    "'Bebas Neue', sans-serif",
+                            fontSize:      '12px',
+                            letterSpacing: '0.55em',
+                            color:         'rgba(255,212,202,0.35)',
+                        }}>
+                            ◆ &nbsp; AALAP STUDIO &nbsp; ◆
+                        </span>
                     </div>
 
-                    {/* ── REGISTER PANEL ── */}
-                    <div style={{
-                        position:    'absolute',
-                        right: 0, top: 0,
-                        width:       '50%',
-                        height:      '100%',
-                        display:     'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        padding:     '40px 52px',
-                    }}>
-                        <div style={{ marginBottom: '32px' }}>
-                            <p style={{
-                                fontFamily:    "'Bebas Neue', sans-serif",
-                                fontSize:      '11px',
-                                letterSpacing: '0.35em',
-                                color:         'rgba(255,212,202,0.45)',
-                                marginBottom:  '8px',
-                            }}>
-                                02 — JOIN
-                            </p>
-                            <h1 style={{
-                                fontFamily:    "'Bebas Neue', sans-serif",
-                                fontSize:      '54px',
-                                letterSpacing: '0.04em',
-                                color:         '#FCFCFC',
-                                lineHeight:    1,
-                                marginBottom:  '8px',
-                            }}>
-                                Start Creating
-                            </h1>
-                            <p style={{
-                                fontFamily: "'Cormorant Garamond', serif",
-                                fontStyle:  'italic',
-                                fontSize:   '16px',
-                                color:      'rgba(255,212,202,0.5)',
-                            }}>
-                                Connecting the talents.
-                            </p>
-                        </div>
-
-                        <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', maxWidth: '300px' }}>
-                            <FloatInput label="Stage Name" type="text" value={regName} onChange={setRegName} placeholder="e.g. Ravi" required />
-                            <FloatInput label="Email Address" type="email" value={regEmail} onChange={setRegEmail} placeholder="you@example.com" required />
-                            <FloatInput
-                                label="Password" type={showRegPwd ? 'text' : 'password'}
-                                value={regPassword} onChange={setRegPassword}
-                                placeholder="••••••••" required
-                                rightEl={<EyeToggle visible={showRegPwd} onToggle={() => setShowRegPwd(v => !v)} />}
-                            />
-                            <SubmitButton isLoading={isLoading} label="Join the Network" loadingLabel="Creating..." />
-                        </form>
+                    {/* Mini waveform */}
+                    <div style={{ width: '120px', height: '120px', marginBottom: '24px', flexShrink: 0 }}>
+                        <CoverWaveform />
                     </div>
 
-                    {/* ── SLIDING COVER PANEL ── */}
-                    <div
-                        className="cover-panel"
-                        style={{
-                            position:   'absolute',
-                            top: 0, left: 0,
-                            width:      '50%',
-                            height:     '100%',
-                            display:    'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: 'linear-gradient(145deg, #0D1513 0%, #111A18 55%, #0A100F 100%)',
-                            borderLeft:  '1px solid rgba(255,68,57,0.12)',
-                            borderRight: '1px solid rgba(255,255,255,0.04)',
-                            zIndex:     20,
-                            overflow:   'hidden',
-                            transform:  isLogin ? 'translateX(100%)' : 'translateX(0%)',
-                        }}
-                    >
-                        {/* Cover top line */}
+                    {/* Card */}
+                    <div style={{
+                        position:            'relative',
+                        width:               '100%',
+                        maxWidth:            '420px',
+                        borderRadius:        '24px',
+                        background:          'rgba(8,12,11,0.88)',
+                        backdropFilter:      'blur(36px)',
+                        WebkitBackdropFilter:'blur(36px)',
+                        border:              '1px solid rgba(255,255,255,0.07)',
+                        boxShadow:           '0 0 0 1px rgba(255,255,255,0.03), 0 32px 72px rgba(0,0,0,0.65), 0 0 100px rgba(255,68,57,0.07)',
+                        overflow:            'hidden',
+                        animation:           'auth-fade-up 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s both',
+                    }}>
+                        {/* Top accent bar */}
                         <div style={{
                             position:   'absolute',
                             top: 0, left: 0, right: 0,
                             height:     '1.5px',
-                            background: 'linear-gradient(90deg, #FF4439, #FFD4CA, transparent)',
+                            background: 'linear-gradient(90deg, transparent 0%, #FF4439 25%, #FFD4CA 65%, #475B5A 100%)',
+                            zIndex:     1,
                         }} />
 
-                        {/* Cover ambient */}
+                        {/* Tab switcher */}
                         <div style={{
-                            position:   'absolute',
-                            inset:      0,
-                            background: 'radial-gradient(ellipse at 50% 30%, rgba(255,68,57,0.09) 0%, transparent 65%)',
-                            pointerEvents: 'none',
-                        }} />
-
-                        {/* Live waveform */}
-                        <div style={{ width: '200px', height: '200px', marginBottom: '20px', flexShrink: 0 }}>
-                            <CoverWaveform />
-                        </div>
-
-                        {/* Cover text */}
-                        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 32px' }}>
-                            <h2 style={{
-                                fontFamily:    "'Bebas Neue', sans-serif",
-                                fontSize:      '52px',
-                                letterSpacing: '0.1em',
-                                color:         '#FCFCFC',
-                                lineHeight:    1,
-                                marginBottom:  '10px',
-                                textShadow:    '0 0 50px rgba(255,68,57,0.3)',
-                            }}>
-                                {isLogin ? 'New Here?' : 'Hello Again.'}
-                            </h2>
-
-                            <p style={{
-                                fontFamily:  "'Cormorant Garamond', serif",
-                                fontStyle:   'italic',
-                                fontSize:    '15px',
-                                color:       'rgba(255,212,202,0.55)',
-                                lineHeight:  1.65,
-                                maxWidth:    '230px',
-                                margin:      '0 auto 24px',
-                            }}>
-                                {isLogin
-                                    ? 'Aalap is where songs are born. Find your missing pieces.'
-                                    : 'The global studio is waiting. Step inside.'}
-                            </p>
-
-                            <button
-                                onClick={() => setIsLogin(v => !v)}
-                                style={{
-                                    display:       'inline-flex',
-                                    alignItems:    'center',
-                                    gap:           '10px',
-                                    padding:       '11px 26px',
-                                    borderRadius:  '999px',
-                                    border:        '1px solid rgba(255,212,202,0.28)',
-                                    background:    'rgba(255,212,202,0.04)',
-                                    cursor:        'pointer',
-                                    transition:    'all 0.3s ease',
-                                    fontFamily:    "'DM Sans', sans-serif",
-                                    fontSize:      '11px',
-                                    fontWeight:    600,
-                                    letterSpacing: '0.22em',
-                                    textTransform: 'uppercase' as const,
-                                    color:         'rgba(255,212,202,0.75)',
-                                }}
-                                onMouseEnter={e => {
-                                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,212,202,0.1)';
-                                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,212,202,0.5)';
-                                }}
-                                onMouseLeave={e => {
-                                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,212,202,0.04)';
-                                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,212,202,0.28)';
-                                }}
-                            >
-                                {isLogin ? 'Create Account' : 'Sign In'}
-                                <svg fill="none" stroke="rgba(255,212,202,0.6)" viewBox="0 0 24 24" style={{ width: 13, height: 13 }}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Corner labels */}
-                        <div style={{
-                            position:      'absolute',
-                            top: 18, left: 20,
-                            fontFamily:    "'Bebas Neue', sans-serif",
-                            fontSize:      '11px',
-                            letterSpacing: '0.3em',
-                            color:         'rgba(255,68,57,0.3)',
+                            display:       'flex',
+                            borderBottom:  '1px solid rgba(255,255,255,0.06)',
+                            padding:       '0 4px',
+                            gap:           '4px',
+                            paddingTop:    '6px',
                         }}>
-                            Aalap
+                            {[
+                                { label: 'Sign In',  active: isLogin,  onClick: () => setIsLogin(true)  },
+                                { label: 'Join',     active: !isLogin, onClick: () => setIsLogin(false) },
+                            ].map(tab => (
+                                <button
+                                    key={tab.label}
+                                    type="button"
+                                    onClick={tab.onClick}
+                                    style={{
+                                        flex:          1,
+                                        background:    'none',
+                                        border:        'none',
+                                        cursor:        'pointer',
+                                        padding:       '14px 0 12px',
+                                        fontFamily:    "'Bebas Neue', sans-serif",
+                                        fontSize:      '13px',
+                                        letterSpacing: '0.25em',
+                                        color:         tab.active ? '#FF4439' : 'rgba(255,255,255,0.3)',
+                                        borderBottom:  tab.active ? '2px solid #FF4439' : '2px solid transparent',
+                                        marginBottom:  '-1px',
+                                        transition:    'all 0.25s ease',
+                                    }}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
                         </div>
-                        <div style={{
-                            position:      'absolute',
-                            bottom: 18, right: 20,
-                            fontFamily:    "'Cormorant Garamond', serif",
-                            fontStyle:     'italic',
-                            fontSize:      '10px',
-                            color:         'rgba(255,212,202,0.25)',
-                            animation:     'tag-blink 3s ease-in-out infinite',
-                        }}>
-                            ● live
+
+                        {/* Panel content */}
+                        <div style={{ padding: '36px 28px 40px' }}>
+                            {isLogin ? (
+                                <>
+                                    <div style={{ marginBottom: '32px' }}>
+                                        <h1 style={{
+                                            fontFamily:    "'Bebas Neue', sans-serif",
+                                            fontSize:      '42px',
+                                            letterSpacing: '0.04em',
+                                            color:         '#FCFCFC',
+                                            lineHeight:    1,
+                                            marginBottom:  '6px',
+                                        }}>
+                                            Welcome Back
+                                        </h1>
+                                        <p style={{
+                                            fontFamily: "'Cormorant Garamond', serif",
+                                            fontStyle:  'italic',
+                                            fontSize:   '15px',
+                                            color:      'rgba(255,212,202,0.5)',
+                                        }}>
+                                            Your threads are waiting.
+                                        </p>
+                                    </div>
+                                    <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                                        <FloatInput label="Email Address" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="you@example.com" required />
+                                        <FloatInput
+                                            label="Password" type={showLoginPwd ? 'text' : 'password'}
+                                            value={loginPassword} onChange={setLoginPassword}
+                                            placeholder="••••••••" required
+                                            rightEl={<EyeToggle visible={showLoginPwd} onToggle={() => setShowLoginPwd(v => !v)} />}
+                                        />
+                                        <SubmitButton isLoading={isLoading} label="Enter Studio" loadingLabel="Syncing..." />
+                                    </form>
+                                    <p style={{
+                                        marginTop:     '20px',
+                                        textAlign:     'center',
+                                        fontFamily:    "'DM Sans', sans-serif",
+                                        fontSize:      '12px',
+                                        color:         'rgba(255,255,255,0.25)',
+                                        letterSpacing: '0.04em',
+                                    }}>
+                                        New here?{' '}
+                                        <button type="button" onClick={() => setIsLogin(false)} style={{
+                                            background:    'none',
+                                            border:        'none',
+                                            cursor:        'pointer',
+                                            color:         'rgba(255,212,202,0.55)',
+                                            fontFamily:    "'DM Sans', sans-serif",
+                                            fontSize:      '12px',
+                                            padding:       0,
+                                            textDecoration:'underline',
+                                        }}>
+                                            Create an account
+                                        </button>
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <div style={{ marginBottom: '32px' }}>
+                                        <h1 style={{
+                                            fontFamily:    "'Bebas Neue', sans-serif",
+                                            fontSize:      '42px',
+                                            letterSpacing: '0.04em',
+                                            color:         '#FCFCFC',
+                                            lineHeight:    1,
+                                            marginBottom:  '6px',
+                                        }}>
+                                            Start Creating
+                                        </h1>
+                                        <p style={{
+                                            fontFamily: "'Cormorant Garamond', serif",
+                                            fontStyle:  'italic',
+                                            fontSize:   '15px',
+                                            color:      'rgba(255,212,202,0.5)',
+                                        }}>
+                                            Connecting the talents.
+                                        </p>
+                                    </div>
+                                    <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                                        <FloatInput label="Stage Name" type="text" value={regName} onChange={setRegName} placeholder="e.g. Ravi" required />
+                                        <FloatInput label="Email Address" type="email" value={regEmail} onChange={setRegEmail} placeholder="you@example.com" required />
+                                        <FloatInput
+                                            label="Password" type={showRegPwd ? 'text' : 'password'}
+                                            value={regPassword} onChange={setRegPassword}
+                                            placeholder="••••••••" required
+                                            rightEl={<EyeToggle visible={showRegPwd} onToggle={() => setShowRegPwd(v => !v)} />}
+                                        />
+                                        <SubmitButton isLoading={isLoading} label="Join the Network" loadingLabel="Creating..." />
+                                    </form>
+                                    <p style={{
+                                        marginTop:     '20px',
+                                        textAlign:     'center',
+                                        fontFamily:    "'DM Sans', sans-serif",
+                                        fontSize:      '12px',
+                                        color:         'rgba(255,255,255,0.25)',
+                                        letterSpacing: '0.04em',
+                                    }}>
+                                        Already have an account?{' '}
+                                        <button type="button" onClick={() => setIsLogin(true)} style={{
+                                            background:    'none',
+                                            border:        'none',
+                                            cursor:        'pointer',
+                                            color:         'rgba(255,212,202,0.55)',
+                                            fontFamily:    "'DM Sans', sans-serif",
+                                            fontSize:      '12px',
+                                            padding:       0,
+                                            textDecoration:'underline',
+                                        }}>
+                                            Sign in
+                                        </button>
+                                    </p>
+                                </>
+                            )}
                         </div>
                     </div>
 
-                </div>
-
-                {/* Bottom tagline */}
-                <div style={{
-                    marginTop:   '28px',
-                    display:     'flex',
-                    alignItems:  'center',
-                    gap:         '16px',
-                    userSelect:  'none',
-                    animation:   'auth-fade-up 0.8s 0.4s ease both',
-                    opacity:     0,
-                }}>
-                    {['Compose', 'Collaborate', 'Release'].map((word, i) => (
-                        <span key={word} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <span style={{
-                                fontFamily:    "'DM Sans', sans-serif",
-                                fontSize:      '9px',
-                                letterSpacing: '0.28em',
-                                textTransform: 'uppercase' as const,
-                                color:         'rgba(252,252,252,0.18)',
-                            }}>
-                                {word}
+                    {/* Bottom tagline */}
+                    <div style={{
+                        marginTop:  '28px',
+                        display:    'flex',
+                        alignItems: 'center',
+                        gap:        '12px',
+                        userSelect: 'none',
+                        animation:  'auth-fade-up 0.8s 0.4s ease both',
+                        opacity:    0,
+                    }}>
+                        {['Compose', 'Collaborate', 'Release'].map((word, i) => (
+                            <span key={word} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{
+                                    fontFamily:    "'DM Sans', sans-serif",
+                                    fontSize:      '8px',
+                                    letterSpacing: '0.22em',
+                                    textTransform: 'uppercase' as const,
+                                    color:         'rgba(252,252,252,0.18)',
+                                }}>
+                                    {word}
+                                </span>
+                                {i < 2 && (
+                                    <span style={{ color: 'rgba(255,68,57,0.3)', fontSize: '6px' }}>◆</span>
+                                )}
                             </span>
-                            {i < 2 && (
-                                <span style={{ color: 'rgba(255,68,57,0.3)', fontSize: '7px' }}>◆</span>
-                            )}
-                        </span>
-                    ))}
+                        ))}
+                    </div>
                 </div>
 
-            </div>
+            ) : (
+
+                // ── DESKTOP LAYOUT ──
+                <div style={{
+                    position:       'relative',
+                    zIndex:         10,
+                    minHeight:      '100vh',
+                    display:        'flex',
+                    flexDirection:  'column',
+                    alignItems:     'center',
+                    justifyContent: 'center',
+                    padding:        '24px 16px',
+                    fontFamily:     "'DM Sans', sans-serif",
+                }}>
+                    {/* Top wordmark */}
+                    <div style={{
+                        marginBottom: '28px',
+                        textAlign:    'center',
+                        animation:    'wordmark-in 0.9s cubic-bezier(0.16,1,0.3,1) both',
+                    }}>
+                        <span style={{
+                            fontFamily:    "'Bebas Neue', sans-serif",
+                            fontSize:      '13px',
+                            letterSpacing: '0.55em',
+                            color:         'rgba(255,212,202,0.35)',
+                        }}>
+                            ◆ &nbsp; AALAP STUDIO &nbsp; ◆
+                        </span>
+                    </div>
+
+                    {/* Card */}
+                    <div style={{
+                        position:            'relative',
+                        width:               '100%',
+                        maxWidth:            '920px',
+                        height:              'clamp(480px, 56vh, 580px)',
+                        borderRadius:        '28px',
+                        background:          'rgba(8,12,11,0.85)',
+                        backdropFilter:      'blur(36px)',
+                        WebkitBackdropFilter:'blur(36px)',
+                        border:              '1px solid rgba(255,255,255,0.07)',
+                        boxShadow:           '0 0 0 1px rgba(255,255,255,0.03), 0 48px 96px rgba(0,0,0,0.65), 0 0 140px rgba(255,68,57,0.07)',
+                        overflow:            'hidden',
+                        animation:           'auth-fade-up 0.7s cubic-bezier(0.16,1,0.3,1) 0.1s both',
+                    }}>
+                        {/* Top accent bar */}
+                        <div style={{
+                            position:   'absolute',
+                            top: 0, left: 0, right: 0,
+                            height:     '1.5px',
+                            background: 'linear-gradient(90deg, transparent 0%, #FF4439 25%, #FFD4CA 65%, #475B5A 100%)',
+                            zIndex:     1,
+                        }} />
+
+                        {/* ── LOGIN PANEL ── */}
+                        <div style={{
+                            position:       'absolute',
+                            left: 0, top: 0,
+                            width:          '50%',
+                            height:         '100%',
+                            display:        'flex',
+                            flexDirection:  'column',
+                            justifyContent: 'center',
+                            padding:        '40px clamp(28px, 5%, 52px)',
+                            borderRight:    '1px solid rgba(255,255,255,0.04)',
+                        }}>
+                            <div style={{ marginBottom: '36px' }}>
+                                <p style={{
+                                    fontFamily:    "'Bebas Neue', sans-serif",
+                                    fontSize:      '11px',
+                                    letterSpacing: '0.35em',
+                                    color:         'rgba(255,68,57,0.6)',
+                                    marginBottom:  '8px',
+                                }}>
+                                    01 — SIGN IN
+                                </p>
+                                <h1 style={{
+                                    fontFamily:    "'Bebas Neue', sans-serif",
+                                    fontSize:      'clamp(38px, 4vw, 54px)',
+                                    letterSpacing: '0.04em',
+                                    color:         '#FCFCFC',
+                                    lineHeight:    1,
+                                    marginBottom:  '8px',
+                                }}>
+                                    Welcome Back
+                                </h1>
+                                <p style={{
+                                    fontFamily: "'Cormorant Garamond', serif",
+                                    fontStyle:  'italic',
+                                    fontSize:   '16px',
+                                    color:      'rgba(255,212,202,0.5)',
+                                }}>
+                                    Your threads are waiting.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', maxWidth: '300px' }}>
+                                <FloatInput label="Email Address" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="you@example.com" required />
+                                <FloatInput
+                                    label="Password" type={showLoginPwd ? 'text' : 'password'}
+                                    value={loginPassword} onChange={setLoginPassword}
+                                    placeholder="••••••••" required
+                                    rightEl={<EyeToggle visible={showLoginPwd} onToggle={() => setShowLoginPwd(v => !v)} />}
+                                />
+                                <SubmitButton isLoading={isLoading} label="Enter Studio" loadingLabel="Syncing..." />
+                            </form>
+                        </div>
+
+                        {/* ── REGISTER PANEL ── */}
+                        <div style={{
+                            position:       'absolute',
+                            right: 0, top: 0,
+                            width:          '50%',
+                            height:         '100%',
+                            display:        'flex',
+                            flexDirection:  'column',
+                            justifyContent: 'center',
+                            padding:        '40px clamp(28px, 5%, 52px)',
+                        }}>
+                            <div style={{ marginBottom: '32px' }}>
+                                <p style={{
+                                    fontFamily:    "'Bebas Neue', sans-serif",
+                                    fontSize:      '11px',
+                                    letterSpacing: '0.35em',
+                                    color:         'rgba(255,212,202,0.45)',
+                                    marginBottom:  '8px',
+                                }}>
+                                    02 — JOIN
+                                </p>
+                                <h1 style={{
+                                    fontFamily:    "'Bebas Neue', sans-serif",
+                                    fontSize:      'clamp(38px, 4vw, 54px)',
+                                    letterSpacing: '0.04em',
+                                    color:         '#FCFCFC',
+                                    lineHeight:    1,
+                                    marginBottom:  '8px',
+                                }}>
+                                    Start Creating
+                                </h1>
+                                <p style={{
+                                    fontFamily: "'Cormorant Garamond', serif",
+                                    fontStyle:  'italic',
+                                    fontSize:   '16px',
+                                    color:      'rgba(255,212,202,0.5)',
+                                }}>
+                                    Connecting the talents.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', maxWidth: '300px' }}>
+                                <FloatInput label="Stage Name" type="text" value={regName} onChange={setRegName} placeholder="e.g. Ravi" required />
+                                <FloatInput label="Email Address" type="email" value={regEmail} onChange={setRegEmail} placeholder="you@example.com" required />
+                                <FloatInput
+                                    label="Password" type={showRegPwd ? 'text' : 'password'}
+                                    value={regPassword} onChange={setRegPassword}
+                                    placeholder="••••••••" required
+                                    rightEl={<EyeToggle visible={showRegPwd} onToggle={() => setShowRegPwd(v => !v)} />}
+                                />
+                                <SubmitButton isLoading={isLoading} label="Join the Network" loadingLabel="Creating..." />
+                            </form>
+                        </div>
+
+                        {/* ── SLIDING COVER PANEL ── */}
+                        <div
+                            className="cover-panel"
+                            style={{
+                                position:       'absolute',
+                                top: 0, left: 0,
+                                width:          '50%',
+                                height:         '100%',
+                                display:        'flex',
+                                flexDirection:  'column',
+                                alignItems:     'center',
+                                justifyContent: 'center',
+                                background:     'linear-gradient(145deg, #0D1513 0%, #111A18 55%, #0A100F 100%)',
+                                borderLeft:     '1px solid rgba(255,68,57,0.12)',
+                                borderRight:    '1px solid rgba(255,255,255,0.04)',
+                                zIndex:         20,
+                                overflow:       'hidden',
+                                transform:      isLogin ? 'translateX(100%)' : 'translateX(0%)',
+                            }}
+                        >
+                            {/* Cover top line */}
+                            <div style={{
+                                position:   'absolute',
+                                top: 0, left: 0, right: 0,
+                                height:     '1.5px',
+                                background: 'linear-gradient(90deg, #FF4439, #FFD4CA, transparent)',
+                            }} />
+
+                            {/* Cover ambient */}
+                            <div style={{
+                                position:      'absolute',
+                                inset:         0,
+                                background:    'radial-gradient(ellipse at 50% 30%, rgba(255,68,57,0.09) 0%, transparent 65%)',
+                                pointerEvents: 'none',
+                            }} />
+
+                            {/* Live waveform */}
+                            <div style={{ width: '180px', height: '180px', marginBottom: '16px', flexShrink: 0 }}>
+                                <CoverWaveform />
+                            </div>
+
+                            {/* Cover text */}
+                            <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 28px' }}>
+                                <h2 style={{
+                                    fontFamily:    "'Bebas Neue', sans-serif",
+                                    fontSize:      'clamp(36px, 4vw, 52px)',
+                                    letterSpacing: '0.1em',
+                                    color:         '#FCFCFC',
+                                    lineHeight:    1,
+                                    marginBottom:  '10px',
+                                    textShadow:    '0 0 50px rgba(255,68,57,0.3)',
+                                }}>
+                                    {isLogin ? 'New Here?' : 'Hello Again.'}
+                                </h2>
+
+                                <p style={{
+                                    fontFamily: "'Cormorant Garamond', serif",
+                                    fontStyle:  'italic',
+                                    fontSize:   '15px',
+                                    color:      'rgba(255,212,202,0.55)',
+                                    lineHeight: 1.65,
+                                    maxWidth:   '220px',
+                                    margin:     '0 auto 20px',
+                                }}>
+                                    {isLogin
+                                        ? 'Aalap is where songs are born. Find your missing pieces.'
+                                        : 'The global studio is waiting. Step inside.'}
+                                </p>
+
+                                <button
+                                    onClick={() => setIsLogin(v => !v)}
+                                    style={{
+                                        display:       'inline-flex',
+                                        alignItems:    'center',
+                                        gap:           '10px',
+                                        padding:       '11px 26px',
+                                        borderRadius:  '999px',
+                                        border:        '1px solid rgba(255,212,202,0.28)',
+                                        background:    'rgba(255,212,202,0.04)',
+                                        cursor:        'pointer',
+                                        transition:    'all 0.3s ease',
+                                        fontFamily:    "'DM Sans', sans-serif",
+                                        fontSize:      '11px',
+                                        fontWeight:    600,
+                                        letterSpacing: '0.22em',
+                                        textTransform: 'uppercase' as const,
+                                        color:         'rgba(255,212,202,0.75)',
+                                    }}
+                                    onMouseEnter={e => {
+                                        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,212,202,0.1)';
+                                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,212,202,0.5)';
+                                    }}
+                                    onMouseLeave={e => {
+                                        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,212,202,0.04)';
+                                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,212,202,0.28)';
+                                    }}
+                                >
+                                    {isLogin ? 'Create Account' : 'Sign In'}
+                                    <svg fill="none" stroke="rgba(255,212,202,0.6)" viewBox="0 0 24 24" style={{ width: 13, height: 13 }}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {/* Corner labels */}
+                            <div style={{
+                                position:      'absolute',
+                                top: 18, left: 20,
+                                fontFamily:    "'Bebas Neue', sans-serif",
+                                fontSize:      '11px',
+                                letterSpacing: '0.3em',
+                                color:         'rgba(255,68,57,0.3)',
+                            }}>
+                                Aalap
+                            </div>
+                            <div style={{
+                                position:   'absolute',
+                                bottom: 18, right: 20,
+                                fontFamily: "'Cormorant Garamond', serif",
+                                fontStyle:  'italic',
+                                fontSize:   '10px',
+                                color:      'rgba(255,212,202,0.25)',
+                                animation:  'tag-blink 3s ease-in-out infinite',
+                            }}>
+                                ● live
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Bottom tagline */}
+                    <div style={{
+                        marginTop:  '28px',
+                        display:    'flex',
+                        alignItems: 'center',
+                        gap:        '16px',
+                        userSelect: 'none',
+                        animation:  'auth-fade-up 0.8s 0.4s ease both',
+                        opacity:    0,
+                    }}>
+                        {['Compose', 'Collaborate', 'Release'].map((word, i) => (
+                            <span key={word} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <span style={{
+                                    fontFamily:    "'DM Sans', sans-serif",
+                                    fontSize:      '9px',
+                                    letterSpacing: '0.28em',
+                                    textTransform: 'uppercase' as const,
+                                    color:         'rgba(252,252,252,0.18)',
+                                }}>
+                                    {word}
+                                </span>
+                                {i < 2 && (
+                                    <span style={{ color: 'rgba(255,68,57,0.3)', fontSize: '7px' }}>◆</span>
+                                )}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
         </>
     );
 }
