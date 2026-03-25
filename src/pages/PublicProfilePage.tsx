@@ -229,12 +229,19 @@ export default function PublicProfilePage() {
                     <div style={{ animation: 'fade-up 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' }}>
                         <WaveformAvatar initial={initial} isReady={isReady} />
                     </div>
-                    <div className="flex items-end gap-0 mt-4 overflow-hidden" style={{ lineHeight: 1 }}>
-                        {nameChars.map((char, i) => (
-                            <span key={i} className="font-anton text-6xl md:text-7xl tracking-wide uppercase text-[#FCFCFC]" style={{ minWidth: char === ' ' ? '0.3em' : undefined, animation: `char-drop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${0.35 + i * 0.04}s both`, textShadow: '0 2px 20px rgba(0,0,0,0.5)' }}>
-                                {char === ' ' ? '\u00A0' : char}
-                            </span>
-                        ))}
+                    <div className="flex flex-wrap justify-center items-end gap-x-[0.25em] gap-y-0 mt-4 w-full px-6 overflow-y-hidden" style={{ lineHeight: 1 }}>
+                        {userName !== '?' && userName.split(' ').map((word, wi, words) => {
+                            const charOffset = words.slice(0, wi).reduce((acc, w) => acc + w.length + 1, 0);
+                            return (
+                                <span key={wi} className="inline-flex items-end" style={{ whiteSpace: 'nowrap' }}>
+                                    {word.split('').map((char, ci) => (
+                                        <span key={ci} className="font-anton tracking-wide uppercase text-[#FCFCFC]" style={{ display: 'inline-block', fontSize: 'clamp(2rem, 11vw, 4.5rem)', animation: `char-drop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${0.35 + (charOffset + ci) * 0.04}s both`, textShadow: '0 2px 20px rgba(0,0,0,0.5)' }}>
+                                            {char}
+                                        </span>
+                                    ))}
+                                </span>
+                            );
+                        })}
                     </div>
                     <div className="mt-1 h-[2px] w-32" style={{ background: 'linear-gradient(90deg, transparent, #FF4439, transparent)', animation: 'name-line 0.6s ease-out 0.8s both' }} />
                     <p className="font-dm text-sm text-white/20 mt-3 tracking-wide" style={{ animation: 'fade-up 0.5s ease-out 0.85s both' }}>{userEmail}</p>
@@ -247,8 +254,8 @@ export default function PublicProfilePage() {
                     <div className="grid grid-cols-3 divide-x divide-white/[0.05]">
                         {[{ label: 'Threads', value: countThreads, accent: '#FFD4CA', delay: '0.55s' }, { label: 'Total Stems', value: countStems, accent: '#FF4439', delay: '0.65s' }, { label: 'Collaborators', value: countCollabs, accent: '#8BAFAE', delay: '0.75s' }].map(stat => (
                             <div key={stat.label} className="group relative flex flex-col items-center py-8 cursor-default" style={{ animation: `stat-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${stat.delay} both` }}>
-                                <p className="font-anton text-5xl md:text-6xl leading-none tabular-nums" style={{ color: stat.accent }}>{isLoading ? '—' : stat.value}</p>
-                                <p className="font-dm text-[10px] uppercase tracking-[0.25em] text-white/20 mt-2">{stat.label}</p>
+                                <p className="font-anton text-4xl sm:text-5xl md:text-6xl leading-none tabular-nums" style={{ color: stat.accent }}>{isLoading ? '—' : stat.value}</p>
+                                <p className="font-dm text-[9px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.25em] text-white/20 mt-2 text-center">{stat.label}</p>
                             </div>
                         ))}
                     </div>

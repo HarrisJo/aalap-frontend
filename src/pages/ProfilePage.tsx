@@ -415,19 +415,27 @@ export default function ProfilePage() {
                     </div>
 
                     {/* Name — char by char drop */}
-                    <div className="flex items-end gap-0 mt-4 overflow-hidden" style={{ lineHeight: 1 }}>
-                        {nameChars.map((char, i) => (
-                            <span key={i} className="font-anton text-6xl md:text-7xl tracking-wide uppercase"
-                                  style={{
-                                      display: 'inline-block',
-                                      color: char === ' ' ? 'transparent' : '#FCFCFC',
-                                      minWidth: char === ' ' ? '0.3em' : undefined,
-                                      animation: isFirstVisit ? `char-drop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${0.35 + i * 0.04}s both` : undefined,
-                                      textShadow: '0 2px 20px rgba(0,0,0,0.5)',
-                                  }}>
-                                {char === ' ' ? '\u00A0' : char}
-                            </span>
-                        ))}
+                    {/* Name — char by char drop, word-grouped to prevent mid-word line breaks */}
+                    <div className="flex flex-wrap justify-center items-end gap-x-[0.25em] gap-y-0 mt-4 w-full px-6 overflow-y-hidden" style={{ lineHeight: 1 }}>
+                        {userName !== '?' && userName.split(' ').map((word, wi, words) => {
+                            const charOffset = words.slice(0, wi).reduce((acc, w) => acc + w.length + 1, 0);
+                            return (
+                                <span key={wi} className="inline-flex items-end" style={{ whiteSpace: 'nowrap' }}>
+                                    {word.split('').map((char, ci) => (
+                                        <span key={ci} className="font-anton tracking-wide uppercase"
+                                              style={{
+                                                  display: 'inline-block',
+                                                  fontSize: 'clamp(2rem, 11vw, 4.5rem)',
+                                                  color: '#FCFCFC',
+                                                  animation: isFirstVisit ? `char-drop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${0.35 + (charOffset + ci) * 0.04}s both` : undefined,
+                                                  textShadow: '0 2px 20px rgba(0,0,0,0.5)',
+                                              }}>
+                                            {char}
+                                        </span>
+                                    ))}
+                                </span>
+                            );
+                        })}
                     </div>
 
                     {/* Red underline sweep */}
@@ -469,11 +477,11 @@ export default function ProfilePage() {
                                  style={{ animation: isFirstVisit ? `stat-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${stat.delay} both` : undefined }}>
                                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                                      style={{ background: `radial-gradient(ellipse 120px 80px at 50% 100%, ${stat.accent}08 0%, transparent 70%)` }} />
-                                <p className="font-anton text-5xl md:text-6xl leading-none tabular-nums group-hover:scale-105 transition-transform duration-200"
+                                <p className="font-anton text-4xl sm:text-5xl md:text-6xl leading-none tabular-nums group-hover:scale-105 transition-transform duration-200"
                                    style={{ color: stat.accent, textShadow: `0 0 30px ${stat.accent}40` }}>
                                     {isLoading ? '—' : stat.value}
                                 </p>
-                                <p className="font-dm text-[10px] uppercase tracking-[0.25em] text-white/20 mt-2">
+                                <p className="font-dm text-[9px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.25em] text-white/20 mt-2 text-center">
                                     {stat.label}
                                 </p>
                             </div>
