@@ -38,8 +38,13 @@ export const ThreadService = {
         if (bpm)        formData.append('bpm', bpm.toString());
         if (musicalKey) formData.append('musicalKey', musicalKey);
 
+        // ✅ FIX: Do NOT manually set 'Content-Type': 'multipart/form-data'.
+        // When axios sees a FormData body, it automatically sets the correct
+        // Content-Type header including the required `boundary` parameter.
+        // Manually setting it strips the boundary, causing Spring Boot to fail
+        // parsing the body and return 500.
         const response = await axios.post(`${API_URL}/${threadId}/contributions`, formData, {
-            headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' }
+            headers: { ...getAuthHeader() }
         });
         return response.data;
     },
@@ -55,10 +60,11 @@ export const ThreadService = {
         const formData = new FormData();
         formData.append('file', file);
 
+        // ✅ FIX: Same as above — let axios set Content-Type with the boundary.
         const response = await axios.put(
             `${API_URL}/contributions/${contributionId}/file`,
             formData,
-            { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } }
+            { headers: { ...getAuthHeader() } }
         );
         return response.data;
     },
@@ -67,8 +73,9 @@ export const ThreadService = {
         const formData = new FormData();
         formData.append('file', file);
 
+        // ✅ FIX: Same fix applied here too.
         const response = await axios.post(`${API_URL}/${threadId}/master`, formData, {
-            headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' }
+            headers: { ...getAuthHeader() }
         });
         return response.data;
     },
