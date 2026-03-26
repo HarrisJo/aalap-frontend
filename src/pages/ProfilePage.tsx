@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { UserService } from '../services/UserService';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -269,6 +270,9 @@ export default function ProfilePage() {
     const [isReady,      setIsReady]      = useState(false);
     const [isFirstVisit, setIsFirstVisit] = useState(false);
 
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (!token) { navigate('/auth'); return; }
@@ -322,6 +326,23 @@ export default function ProfilePage() {
         localStorage.removeItem('token');
         sessionStorage.clear();
         navigate('/');
+    };
+
+    const handleLeaveAalap = async () => {
+        setIsDeletingProfile(true); // Turns on the loading spinner
+        try {
+            await UserService.deleteMyAccount(); // Calls your backend
+
+            // If successful, wipe their local storage so they are logged out
+            localStorage.removeItem('token');
+            sessionStorage.clear();
+            navigate('/'); // Boot them back to the landing page
+        } catch (error) {
+            console.error('Failed to leave Aalap', error);
+            alert('Could not delete account. Please try again.');
+            setIsDeletingProfile(false);
+            setIsDeleteModalOpen(false); // Close the modal on failure
+        }
     };
 
     const totalStems          = threads.reduce((sum, t) => sum + t.contributionCount, 0);
@@ -567,6 +588,42 @@ export default function ProfilePage() {
                     </div>
                 )}
             </div>
+            {/* ── DANGER ZONE ──────────────────────────────────────────────────────── */}
+            {!isLoading && (
+                <div className="relative z-10 max-w-[1100px] mx-auto px-6 pb-24 pt-10 border-t border-white/[0.05] flex flex-col items-center mt-10">
+                    <p className="font-dm text-sm text-white/30 mb-5 text-center max-w-md">
+                        If you wish to remove your presence, your threads, and your stems from Aalap entirely, you can choose to leave.
+                    </p>
+                    <button onClick={() => setIsDeleteModalOpen(true)}
+                            className="font-anton text-sm tracking-[0.2em] uppercase text-[#FF4439]/60 hover:text-[#FF4439] border border-[#FF4439]/30 hover:border-[#FF4439] hover:bg-[#FF4439]/10 px-8 py-3.5 rounded-xl transition-all duration-300">
+                        Leave Aalap
+                    </button>
+                </div>
+            )}
+
+            {/* ── DELETE CONFIRMATION MODAL ────────────────────────────────────────── */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !isDeletingProfile && setIsDeleteModalOpen(false)} />
+                    <div className="relative z-10 w-full max-w-[420px] bg-[#080C0B] border border-[#FF4439]/30 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#FF4439]/10"
+                         style={{ animation: 'fade-up 0.25s ease-out both' }}>
+                        <h3 className="font-anton text-3xl uppercase tracking-wide text-white mb-2">Leave Aalap?</h3>
+                        <p className="font-dm text-sm text-white/50 mb-8 leading-relaxed">
+                            This will permanently delete your account, <strong className="text-white">all sessions</strong> you've started, and <strong className="text-white">all stems</strong> you've contributed to other threads. This action cannot be undone.
+                        </p>
+                        <div className="flex flex-col gap-3">
+                            <button onClick={handleLeaveAalap} disabled={isDeletingProfile}
+                                    className="w-full font-anton text-sm tracking-[0.15em] uppercase bg-[#FF4439] text-white hover:bg-[#B72F30] py-4 rounded-xl transition-colors flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed">
+                                {isDeletingProfile ? 'Erasing Presence...' : 'Yes, Delete Everything'}
+                            </button>
+                            <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingProfile}
+                                    className="w-full font-dm text-sm text-white/40 hover:text-white py-3 transition-colors disabled:opacity-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
