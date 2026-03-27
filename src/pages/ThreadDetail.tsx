@@ -2,14 +2,16 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ThreadService } from '../services/ThreadService.ts';
-
+import { createPortal } from 'react-dom'; // Add this
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface UserInfo { id: number; name: string; email?: string; }
 
 interface Contribution {
     id: number; role: string; user?: UserInfo;
-    filePath?: string; description: string; createdAt: string;
+    filePath?: string;
+    fileType?: string;
+    description: string; createdAt: string;
 }
 
 interface ThreadDetail {
@@ -136,11 +138,19 @@ export default function ThreadDetailPage() {
     useEffect(() => { fetchThread(); }, [fetchThread]);
 
     useEffect(() => {
-        if (!playingId) { audioRef.current?.pause(); audioRef.current = null; setProgress(0); setDuration(0); return; }
+        if (!playingId) {
+            audioRef.current?.pause();
+            audioRef.current = null;
+            setProgress(0);
+            setDuration(0);
+            return;
+        }
         const url = playingId === 'master'
             ? thread?.masterAudioUrl ?? ''
             : thread?.contributions?.find(c => c.id === playingId)?.filePath ?? '';
+
         if (!url) { setPlayingId(null); return; }
+
         audioRef.current?.pause();
         const audio = new Audio(url);
         audio.volume = volume;
@@ -150,8 +160,7 @@ export default function ThreadDetailPage() {
         audio.play().catch(e => console.error('Play error:', e));
         audioRef.current = audio;
         return () => { audio.pause(); };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [playingId, thread]);
+    }, [playingId, thread, volume]);
 
     useEffect(() => { if (audioRef.current) audioRef.current.volume = volume; }, [volume]);
 
@@ -178,7 +187,7 @@ export default function ThreadDetailPage() {
             setModalOpen(false);
             setContribRole(''); setContribInstrument(''); setContribDescription('');
             setContribFile(null); setContribBpm(''); setContribKey('');
-            showToast('Your stem is in the mix.', 'success');
+            showToast('Your contribution is in the mix.', 'success');
             await fetchThread();
         } catch (err) {
             if (axios.isAxiosError(err)) {
@@ -225,7 +234,6 @@ export default function ThreadDetailPage() {
     const hasComposer   = contributions.some(c => c.role.split(' - ')[0].toLowerCase().trim() === 'composer');
     const currentTime   = duration * progress;
 
-    // ── Loading ────────────────────────────────────────────────────────────────
     if (isLoading) return (
         <div className="min-h-screen bg-[#060808] flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
@@ -249,7 +257,6 @@ export default function ThreadDetailPage() {
         </div>
     );
 
-    // ── RENDER ────────────────────────────────────────────────────────────────
     return (
         <div className="min-h-screen bg-[#060808] text-white overflow-x-hidden">
             <link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -263,6 +270,7 @@ export default function ThreadDetailPage() {
 
                 @keyframes paper-in     { from { opacity:0; transform: rotate(-8deg) translateY(20px) scale(0.92); } to { opacity:1; transform: rotate(-7deg) translateY(0) scale(1); } }
                 @keyframes paper-float  { 0%,100% { transform: rotate(-7deg) translateY(0); } 50% { transform: rotate(-6.2deg) translateY(-4px); } }
+                @keyframes paper-pop-in { from { opacity:0; transform: scale(0.95) translateY(30px) rotate(1deg); } to { opacity:1; transform: scale(1) translateY(0) rotate(0); } }
                 @keyframes pencil-draw  { from { stroke-dashoffset: 300; opacity:0; } to { stroke-dashoffset: 0; opacity:1; } }
                 @keyframes ink-fade-in  { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }
                 @keyframes toast-up    { from { opacity:0; transform:translateY(8px); }  to { opacity:1; transform:translateY(0); } }
@@ -272,9 +280,7 @@ export default function ThreadDetailPage() {
                 @keyframes node-pulse  { 0%,100% { transform:scale(1); opacity:0.8; } 50% { transform:scale(1.4); opacity:1; } }
                 @keyframes bar-play    { 0%,100% { transform:scaleY(0.3); } 50% { transform:scaleY(1); } }
                 @keyframes header-in   { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-                @keyframes glow-pulse  { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
                 @keyframes scan-line   { from { transform:translateX(-100%); } to { transform:translateX(100%); } }
-                @keyframes dawLoad     { from { transform:scaleY(0.2); opacity:0.3 } to { transform:scaleY(1); opacity:1 } }
                 @keyframes ripple-in   { from { transform:scale(0.6); opacity:0; } to { transform:scale(1); opacity:1; } }
                 @keyframes thread-pulse-down { 0% { transform:translateY(-100%); opacity:0; } 50% { opacity:1; } 100% { transform:translateY(200%); opacity:0; } }
 
@@ -284,7 +290,6 @@ export default function ThreadDetailPage() {
                 input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
                 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width:12px; height:12px; border-radius:50%; background:#FF4439; }
                 input[type=range]::-webkit-slider-runnable-track { height:2px; border-radius:2px; background: rgba(255,255,255,0.1); }
-
                 button { -webkit-tap-highlight-color: transparent; }
             `}</style>
 
@@ -301,13 +306,11 @@ export default function ThreadDetailPage() {
             {modalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={() => setModalOpen(false)} />
-                    {/* On mobile: sheet slides from bottom; on desktop: centered modal */}
                     <div className="relative w-full sm:max-w-[500px] animate-[modal-in_0.25s_ease-out] max-h-[92dvh] sm:max-h-none flex flex-col">
                         <div className="absolute -inset-[1px] rounded-t-2xl sm:rounded-2xl z-0"
                              style={{ background: 'linear-gradient(135deg, rgba(255,68,57,0.5) 0%, rgba(71,91,90,0.2) 100%)' }} />
                         <div className="relative z-10 bg-[#080C0B]/98 backdrop-blur-2xl rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col min-h-0">
                             <div className="h-[2px] shrink-0" style={{ background: 'linear-gradient(90deg, #FF4439, #A78BFA, #2DD4BF)' }} />
-                            {/* Drag handle on mobile */}
                             <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
                                 <div className="w-10 h-1 rounded-full bg-white/15" />
                             </div>
@@ -324,7 +327,6 @@ export default function ThreadDetailPage() {
                                     </button>
                                 </div>
                                 <form onSubmit={handleAddContribution} className="flex flex-col gap-4 sm:gap-5">
-                                    {/* Role pills */}
                                     <div className="flex flex-col gap-2">
                                         <label className="font-dm text-[10px] text-white/25 uppercase tracking-widest">Your role</label>
                                         <div className="flex flex-wrap gap-2">
@@ -387,7 +389,7 @@ export default function ThreadDetailPage() {
                                             <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center transition-colors ${contribFile ? 'bg-[#2DD4BF]/20 text-[#2DD4BF]' : 'bg-white/5 text-white/25'}`}>
                                                 {contribFile
                                                     ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>
-                                                    : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>}
+                                                    : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>}
                                             </div>
                                             <div className="flex flex-col min-w-0">
                                                 {contribFile ? (
@@ -420,7 +422,7 @@ export default function ThreadDetailPage() {
                 </div>
             )}
 
-            {/* ── NAVBAR ──────────────────────────────────────────────────────── */}
+            {/* NAVBAR */}
             <nav className="sticky top-0 z-50 bg-[#060808]/90 backdrop-blur-xl border-b border-white/[0.06]"
                  style={{ animation: 'header-in 0.4s ease-out both' }}>
                 <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
@@ -433,8 +435,6 @@ export default function ThreadDetailPage() {
                     </button>
 
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0 overflow-hidden">
-
-                        {/* Last updated label — hidden on very small screens */}
                         <div className="hidden sm:flex items-center gap-1.5 text-white/20 font-dm text-[11px] shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#FF4439]/60 animate-pulse shrink-0" />
                             <span>Last updated</span>
@@ -458,7 +458,6 @@ export default function ThreadDetailPage() {
                             </span>
                         </div>
 
-                        {/* Delete thread button */}
                         {loggedInEmail !== null && thread.createdBy?.email === loggedInEmail && (
                             !confirmingDeleteThread ? (
                                 <button
@@ -489,11 +488,9 @@ export default function ThreadDetailPage() {
                 </div>
             </nav>
 
-            {/* ── THREAD HEADER ───────────────────────────────────────────────── */}
+            {/* THREAD HEADER */}
             <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-7 sm:pt-10 pb-6 sm:pb-8" style={{ animation: 'header-in 0.5s ease-out 0.1s both' }}>
                 <div className="flex items-start justify-between gap-6 sm:gap-12">
-
-                    {/* Left — title + description + cta */}
                     <div className="flex-1 min-w-0">
                         <p className="font-dm text-[10px] text-white/20 uppercase tracking-[0.3em] mb-2">
                             Session — started by{' '}
@@ -511,7 +508,6 @@ export default function ThreadDetailPage() {
                                 {thread.description}
                             </p>
                         )}
-                        {/* Drop a Stem — hidden on mobile (use FAB instead) */}
                         <button onClick={() => setModalOpen(true)}
                                 className="mt-5 sm:mt-6 hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-xl font-anton text-xs tracking-widest uppercase transition-all active:scale-95 bg-[#FF4439] hover:bg-[#B72F30] text-white"
                                 style={{ boxShadow: '0 0 20px rgba(255,68,57,0.2)' }}>
@@ -520,11 +516,8 @@ export default function ThreadDetailPage() {
                         </button>
                     </div>
 
-                    {/* Right — paper note + contributors (desktop only) */}
                     {contributions.length > 0 && (
                         <div className="shrink-0 hidden md:flex items-start gap-6 pt-1">
-
-                            {/* ── PAPER NOTE ── */}
                             {(thread.bpm || thread.musicalKey) && (
                                 <div className="relative self-center"
                                      style={{ animation: 'paper-in 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.4s both' }}>
@@ -589,7 +582,6 @@ export default function ThreadDetailPage() {
                                 </div>
                             )}
 
-                            {/* ── CONTRIBUTORS ── */}
                             <div className="flex flex-col items-end gap-4">
                                 <p className="font-dm text-[9px] uppercase tracking-[0.3em] text-white/15">Woven by</p>
                                 <div className="flex flex-col gap-3">
@@ -618,7 +610,6 @@ export default function ThreadDetailPage() {
                     )}
                 </div>
 
-                {/* Mobile: session metadata pill (BPM / Key) */}
                 {(thread.bpm || thread.musicalKey) && contributions.length > 0 && (
                     <div className="flex md:hidden items-center gap-3 mt-4 flex-wrap">
                         {thread.bpm && (
@@ -637,10 +628,9 @@ export default function ThreadDetailPage() {
                 )}
             </div>
 
-            {/* ── DAW SECTION ─────────────────────────────────────────────────── */}
+            {/* DAW SECTION */}
             <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pb-32">
 
-                {/* MASTER TRACK */}
                 {thread.masterAudioUrl ? (
                     <MasterTrack
                         url={thread.masterAudioUrl}
@@ -666,7 +656,6 @@ export default function ThreadDetailPage() {
                     </label>
                 )}
 
-                {/* DAW TRACKS */}
                 {contributions.length > 0 ? (
                     <div className="relative">
                         <p className="font-dm text-[10px] text-white/15 uppercase tracking-[0.3em] mb-4 sm:mb-6">
@@ -674,10 +663,8 @@ export default function ThreadDetailPage() {
                         </p>
 
                         <div className="relative flex gap-0">
-                            {/* SVG Thread spine — hidden on mobile */}
                             {!isMobile && <ThreadSpine contributions={contributions} />}
 
-                            {/* Track lanes */}
                             <div className={`flex-1 flex flex-col gap-2 ${isMobile ? '' : 'pl-4'}`}>
                                 {contributions.map((contrib, i) => (
                                     <StemTrack
@@ -700,7 +687,6 @@ export default function ThreadDetailPage() {
                             </div>
                         </div>
 
-                        {/* Thread line + CTA */}
                         <div className="relative flex flex-col items-center mt-0">
                             <div className="relative w-[2px] overflow-hidden" style={{ height: 20 }}>
                                 <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(255,68,57,0.5))' }} />
@@ -826,13 +812,22 @@ interface StemTrackProps {
     isMobile: boolean;
 }
 
-function StemTrack({ contrib, index, isPlaying, progress, duration, currentTime, onToggle, onSeek, onCreatorClick, isOwner, onDelete, onReupload, isMobile }: StemTrackProps) {
+function StemTrack({
+                       contrib, index, isPlaying, progress, duration, currentTime,
+                       onToggle, onSeek, onCreatorClick, isOwner, onDelete, onReupload, isMobile
+                   }: StemTrackProps) {
     const rc   = getRoleColor(contrib.role);
     const barCount = isMobile ? 30 : 52;
     const bars = useMemo(() => generateBars(contrib.id, barCount), [contrib.id, barCount]);
-    const hasAudio = !!contrib.filePath;
+
+    const hasAudio = contrib.fileType === 'video' || (!contrib.fileType && (contrib.filePath?.endsWith('.mp3') || contrib.filePath?.endsWith('.wav')));
+    const hasText  = contrib.fileType === 'raw' || (!contrib.fileType && contrib.filePath?.endsWith('.txt'));
+
     const reuploadRef = useRef<HTMLInputElement>(null);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const [textOpen, setTextOpen] = useState(false);
+
+    const reuploadAccept = hasText ? '.txt,.lrc,.srt,.md,text/plain' : 'audio/*';
 
     const wrapperStyle: React.CSSProperties = {
         borderColor: isPlaying ? rc.dot + '50' : 'rgba(255,255,255,0.06)',
@@ -841,254 +836,146 @@ function StemTrack({ contrib, index, isPlaying, progress, duration, currentTime,
         animation: `track-in 0.4s ease-out ${index * 0.08}s both`,
     };
 
-    // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
+    const renderControls = () => (
+        <div className="flex items-center gap-1 shrink-0">
+            {hasAudio && (
+                <button onClick={onToggle}
+                        className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+                        style={isPlaying
+                            ? { backgroundColor: rc.dot, color: '#000' }
+                            : { backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
+                    {isPlaying ? <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg> : <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+                </button>
+            )}
+            {hasText && (
+                <button onClick={() => setTextOpen(true)}
+                        className="px-2.5 py-1.5 rounded-lg font-dm text-[10px] uppercase tracking-widest transition-all"
+                        style={{ backgroundColor: rc.dot + '15', border: `1px solid ${rc.dot}40`, color: rc.dot }}>
+                    Read
+                </button>
+            )}
+            {contrib.filePath && (
+                <a href={contrib.filePath.replace('/upload/', '/upload/fl_attachment/')}
+                   target="_blank" rel="noopener noreferrer" download
+                   className="w-8 h-8 rounded-lg flex items-center justify-center text-white/15 hover:text-white/50 transition-all">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </a>
+            )}
+            {isOwner && (
+                <>
+                    <input ref={reuploadRef} type="file" accept={reuploadAccept} className="hidden"
+                           onChange={e => { const f = e.target.files?.[0]; if (f) onReupload(f); e.target.value = ''; }} />
+                    <button title="Replace file" onClick={e => { e.stopPropagation(); reuploadRef.current?.click(); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 hover:text-[#FFD4CA]/80 transition-all">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    </button>
+                    {!confirmingDelete ? (
+                        <button title="Delete stem" onClick={e => { e.stopPropagation(); setConfirmingDelete(true); }}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 hover:text-[#FF4439]/80 transition-all">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-1 bg-[#1a0808]/90 border border-[#FF4439]/30 rounded-lg px-2 py-1" onClick={e => e.stopPropagation()}>
+                            <span className="font-dm text-[10px] text-white/40">Sure?</span>
+                            <button onClick={() => { setConfirmingDelete(false); onDelete(); }} className="font-dm text-[10px] text-[#FF4439] px-1 transition-colors">Yes</button>
+                            <button onClick={() => setConfirmingDelete(false)} className="font-dm text-[10px] text-white/30 px-1 transition-colors">No</button>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+
     if (isMobile) {
         return (
-            <div className="relative rounded-xl overflow-hidden border transition-all duration-300 group" style={wrapperStyle}>
-                {/* Left color bar */}
-                <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl transition-opacity duration-300"
-                     style={{ backgroundColor: rc.dot, opacity: isPlaying ? 1 : 0.35 }} />
-
-                {isPlaying && (
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
-                        <div className="absolute inset-y-0 w-[60%] opacity-[0.04]"
-                             style={{ background: `linear-gradient(90deg, transparent, ${rc.dot}, transparent)`, animation: 'scan-line 2s linear infinite' }} />
-                    </div>
-                )}
-
-                {/* Row 1: avatar + info + controls */}
-                <div className="flex items-center gap-2.5 pl-4 pr-3 pt-3 pb-2">
-                    {/* Avatar */}
-                    <button onClick={onCreatorClick}
-                            className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center font-anton text-xs transition-all hover:scale-105"
-                            style={{ backgroundColor: rc.dot + '20', border: `1.5px solid ${rc.dot}50`, color: rc.dot, boxShadow: isPlaying ? `0 0 12px ${rc.glow}` : 'none' }}>
-                        {getInitial(contrib.user?.name)}
-                    </button>
-
-                    {/* Name + Role */}
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                            <span className="font-anton text-[10px] tracking-widest uppercase leading-none" style={{ color: rc.dot }}>
-                                {contrib.role.split(' - ')[0]}
-                            </span>
-                            {contrib.role.includes(' - ') && (
-                                <span className="font-dm text-[9px] text-white/30 truncate">· {contrib.role.split(' - ')[1]}</span>
-                            )}
-                        </div>
-                        <button onClick={onCreatorClick} className="font-dm text-sm text-white/60 hover:text-white transition-colors leading-none truncate block max-w-[140px]">
-                            {contrib.user?.name ?? 'Unknown'}
-                        </button>
-                    </div>
-
-                    {/* Controls: play + download + owner */}
-                    <div className="flex items-center gap-1 shrink-0">
-                        {hasAudio && (
-                            <button onClick={onToggle}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
-                                    style={isPlaying
-                                        ? { backgroundColor: rc.dot, color: '#000', boxShadow: `0 0 12px ${rc.glow}` }
-                                        : { backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }}>
-                                {isPlaying
-                                    ? <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
-                                    : <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-                            </button>
-                        )}
-                        {hasAudio && (
-                            <a href={contrib.filePath?.replace('/upload/', '/upload/fl_attachment/')}
-                               target="_blank" rel="noopener noreferrer" download={`stem-${contrib.role}`}
-                               onClick={e => e.stopPropagation()}
-                               className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 hover:text-white/50 transition-all">
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                </svg>
-                            </a>
-                        )}
-                        {isOwner && (
-                            <>
-                                <input ref={reuploadRef} type="file" accept="audio/*" className="hidden"
-                                       onChange={e => { const f = e.target.files?.[0]; if (f) onReupload(f); e.target.value = ''; }} />
-                                <button title="Replace file" onClick={e => { e.stopPropagation(); reuploadRef.current?.click(); }}
-                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 hover:text-[#FFD4CA]/80 transition-all">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                                    </svg>
+            <>
+                <div className="relative rounded-xl overflow-hidden border transition-all duration-300 group" style={wrapperStyle}>
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl transition-opacity duration-300"
+                         style={{ backgroundColor: rc.dot, opacity: isPlaying ? 1 : 0.35 }} />
+                    <div className="flex flex-col p-3 gap-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <button onClick={onCreatorClick} className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center font-anton text-[10px]" style={{ backgroundColor: rc.dot + '20', border: `1px solid ${rc.dot}50`, color: rc.dot }}>
+                                    {getInitial(contrib.user?.name)}
                                 </button>
-                                {!confirmingDelete ? (
-                                    <button title="Delete stem" onClick={e => { e.stopPropagation(); setConfirmingDelete(true); }}
-                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-white/20 hover:text-[#FF4439]/80 transition-all">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                    </button>
-                                ) : (
-                                    <div className="flex items-center gap-1 bg-[#1a0808]/90 border border-[#FF4439]/30 rounded-lg px-2 py-1" onClick={e => e.stopPropagation()}>
-                                        <span className="font-dm text-[10px] text-white/40">Sure?</span>
-                                        <button onClick={() => { setConfirmingDelete(false); onDelete(); }} className="font-dm text-[10px] text-[#FF4439] px-1">Yes</button>
-                                        <button onClick={() => setConfirmingDelete(false)} className="font-dm text-[10px] text-white/30 px-1">No</button>
+                                <div className="min-w-0">
+                                    <span className="font-anton text-[9px] tracking-widest uppercase block leading-none" style={{ color: rc.dot }}>{contrib.role.split(' - ')[0]}</span>
+                                    <span className="font-dm text-xs text-white/60 truncate block leading-none mt-1">{contrib.user?.name ?? 'Unknown'}</span>
+                                </div>
+                            </div>
+                            {renderControls()}
+                        </div>
+                        {hasAudio && (
+                            <div className="flex flex-col gap-1.5 mt-1">
+                                <div className="flex items-end gap-[2px] h-6 cursor-pointer" onClick={onToggle}>
+                                    {bars.map((h, i) => (
+                                        <div key={i} className={isPlaying ? 'bar-playing' : ''} style={{ width: 2.5, height: `${h}%`, borderRadius: 1, flexShrink: 0, backgroundColor: (isPlaying && (i / bars.length) < progress) ? rc.bar : rc.dot + '20' }} />
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-[2px] rounded-full bg-white/5 overflow-hidden" onClick={onSeek}>
+                                        <div className="h-full bg-white/20" style={{ width: `${progress * 100}%` }} />
                                     </div>
-                                )}
-                            </>
+                                    <span className="font-dm text-[9px] text-white/30 tabular-nums">{isPlaying ? formatTime(currentTime) : formatTime(duration)}</span>
+                                </div>
+                            </div>
                         )}
+                        {contrib.description && <p className="font-dm text-[10px] text-white/25 truncate">{contrib.description}</p>}
                     </div>
                 </div>
-
-                {/* Row 2: waveform + progress (full width) */}
-                {hasAudio && (
-                    <div className="pl-4 pr-3 pb-3">
-                        <div className="flex items-end gap-[2px] h-8 mb-1.5 cursor-pointer" onClick={onToggle}>
-                            {bars.map((h, i) => {
-                                const inProgress = isPlaying && (i / bars.length) < progress;
-                                return (
-                                    <div key={i} className={isPlaying ? 'bar-playing' : ''}
-                                         style={{ width: 3, height: `${h}%`, borderRadius: 2, flexShrink: 0,
-                                             backgroundColor: inProgress ? rc.bar : rc.dot + '30',
-                                             transition: 'background-color 0.1s',
-                                             animationDelay: isPlaying ? `${(i % 8) * 0.05}s` : '0s',
-                                             animationDuration: isPlaying ? `${0.3 + (i % 5) * 0.08}s` : '0s' }} />
-                                );
-                            })}
-                        </div>
-                        {contrib.description && (
-                            <p className="font-dm text-[11px] text-white/25 leading-relaxed truncate mb-1.5">{contrib.description}</p>
-                        )}
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 h-[3px] rounded-full bg-white/[0.06] cursor-pointer overflow-hidden" onClick={onSeek}>
-                                <div className="h-full rounded-full transition-all duration-100"
-                                     style={{ width: `${isPlaying ? progress * 100 : 0}%`, backgroundColor: rc.bar }} />
-                            </div>
-                            <span className="font-dm text-[10px] text-white/20 tabular-nums shrink-0">
-                                {isPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
-                            </span>
-                        </div>
-                    </div>
-                )}
-            </div>
+                {hasText && <LinedPaperModal isOpen={textOpen} onClose={() => setTextOpen(false)} fileUrl={contrib.filePath ?? ''} role={contrib.role} contributor={contrib.user?.name ?? ''} rc={rc} />}
+            </>
         );
     }
 
-    // ── DESKTOP LAYOUT ─────────────────────────────────────────────────────────
     return (
-        <div className="relative rounded-xl overflow-hidden border transition-all duration-300 group" style={wrapperStyle}>
-            <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl transition-opacity duration-300"
-                 style={{ backgroundColor: rc.dot, opacity: isPlaying ? 1 : 0.35 }} />
-            {isPlaying && (
-                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
-                    <div className="absolute inset-y-0 w-[60%] opacity-[0.04]"
-                         style={{ background: `linear-gradient(90deg, transparent, ${rc.dot}, transparent)`, animation: 'scan-line 2s linear infinite' }} />
-                </div>
-            )}
-            <div className="flex items-center gap-0 pl-4 pr-4 py-3">
-                {/* Role + Artist info */}
-                <div className="flex items-center gap-3 w-[200px] shrink-0">
-                    <button onClick={onCreatorClick}
-                            className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-anton text-sm transition-all hover:scale-105"
-                            style={{ backgroundColor: rc.dot + '20', border: `1.5px solid ${rc.dot}50`, color: rc.dot, boxShadow: isPlaying ? `0 0 12px ${rc.glow}` : 'none' }}>
-                        {getInitial(contrib.user?.name)}
-                    </button>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-1 mb-0.5">
-                            <span className="font-anton text-[10px] tracking-widest uppercase leading-none" style={{ color: rc.dot }}>
-                                {contrib.role.split(' - ')[0]}
-                            </span>
-                            {contrib.role.includes(' - ') && (
-                                <span className="font-dm text-[9px] text-white/30">· {contrib.role.split(' - ')[1]}</span>
-                            )}
-                        </div>
-                        <button onClick={onCreatorClick} className="font-dm text-sm text-white/60 hover:text-white transition-colors leading-none truncate block max-w-[120px]">
-                            {contrib.user?.name ?? 'Unknown'}
+        <>
+            <div className="relative rounded-xl overflow-hidden border transition-all duration-300 group" style={wrapperStyle}>
+                <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl transition-opacity duration-300"
+                     style={{ backgroundColor: rc.dot, opacity: isPlaying ? 1 : 0.35 }} />
+                <div className="flex items-center gap-4 pl-4 pr-4 py-3">
+                    <div className="flex items-center gap-3 w-[180px] shrink-0">
+                        <button onClick={onCreatorClick} className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-anton text-sm transition-all hover:scale-105" style={{ backgroundColor: rc.dot + '20', border: `1.5px solid ${rc.dot}50`, color: rc.dot }}>
+                            {getInitial(contrib.user?.name)}
                         </button>
-                        <span className="font-dm text-[9px] text-white/20 leading-none mt-0.5 block">{formatDate(contrib.createdAt)}</span>
+                        <div className="min-w-0">
+                            <span className="font-anton text-[10px] tracking-widest uppercase leading-none block" style={{ color: rc.dot }}>{contrib.role.split(' - ')[0]}</span>
+                            <button onClick={onCreatorClick} className="font-dm text-sm text-white/60 hover:text-white transition-colors truncate block leading-none mt-1">{contrib.user?.name ?? 'Unknown'}</button>
+                        </div>
                     </div>
-                </div>
 
-                {/* Play button */}
-                {hasAudio && (
-                    <button onClick={onToggle}
-                            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-all mx-3"
-                            style={isPlaying
-                                ? { backgroundColor: rc.dot, color: '#000', boxShadow: `0 0 16px ${rc.glow}` }
-                                : { backgroundColor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)' }}>
-                        {isPlaying
-                            ? <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
-                            : <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-                    </button>
-                )}
-
-                {/* Waveform + progress */}
-                <div className="flex-1 flex flex-col gap-2 min-w-0">
-                    {hasAudio && (
-                        <div className="flex items-end gap-[2px] h-10 cursor-pointer" onClick={onToggle}>
-                            {bars.map((h, i) => {
-                                const inProgress = isPlaying && (i / bars.length) < progress;
-                                return (
-                                    <div key={i} className={isPlaying ? 'bar-playing' : ''}
-                                         style={{ width: 3, height: `${h}%`, borderRadius: 2, flexShrink: 0,
-                                             backgroundColor: inProgress ? rc.bar : rc.dot + '30',
-                                             transition: 'background-color 0.1s',
-                                             animationDelay: isPlaying ? `${(i % 8) * 0.05}s` : '0s',
-                                             animationDuration: isPlaying ? `${0.3 + (i % 5) * 0.08}s` : '0s' }} />
-                                );
-                            })}
-                        </div>
-                    )}
-                    {contrib.description && (
-                        <p className="font-dm text-xs text-white/30 leading-relaxed truncate">{contrib.description}</p>
-                    )}
-                    {hasAudio && (
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 h-[3px] rounded-full bg-white/[0.06] cursor-pointer overflow-hidden" onClick={onSeek}>
-                                <div className="h-full rounded-full transition-all duration-100"
-                                     style={{ width: `${isPlaying ? progress * 100 : 0}%`, backgroundColor: rc.bar }} />
+                    <div className="flex-1 flex flex-col gap-2 min-w-0">
+                        {hasAudio ? (
+                            <div className="flex items-center gap-3">
+                                <button onClick={onToggle} className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-all">
+                                    {isPlaying ? <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg> : <svg className="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+                                </button>
+                                <div className="flex-1 flex flex-col gap-1.5">
+                                    <div className="flex items-end gap-[2px] h-8 cursor-pointer" onClick={onToggle}>
+                                        {bars.map((h, i) => (
+                                            <div key={i} className={isPlaying ? 'bar-playing' : ''} style={{ width: 3, height: `${h}%`, borderRadius: 1.5, flexShrink: 0, backgroundColor: (isPlaying && (i / bars.length) < progress) ? rc.bar : rc.dot + '20' }} />
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1 h-[2px] rounded-full bg-white/5 cursor-pointer relative" onClick={onSeek}>
+                                            <div className="absolute inset-y-0 left-0 bg-white/20 rounded-full transition-all" style={{ width: `${progress * 100}%` }} />
+                                        </div>
+                                        <span className="font-dm text-[10px] text-white/20 tabular-nums w-20 text-right">{isPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <span className="font-dm text-[10px] text-white/20 tabular-nums shrink-0 w-[80px] text-right">
-                                {isPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Download */}
-                {hasAudio && (
-                    <a href={contrib.filePath?.replace('/upload/', '/upload/fl_attachment/')}
-                       target="_blank" rel="noopener noreferrer" download={`stem-${contrib.role}`}
-                       title="Download" onClick={e => e.stopPropagation()}
-                       className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white/15 hover:text-white/50 hover:bg-white/5 transition-all ml-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                        </svg>
-                    </a>
-                )}
-
-                {/* Owner-only: Reupload + Delete */}
-                {isOwner && (
-                    <div className="flex items-center gap-1 ml-1 shrink-0">
-                        <input ref={reuploadRef} type="file" accept="audio/*" className="hidden"
-                               onChange={e => { const file = e.target.files?.[0]; if (file) onReupload(file); e.target.value = ''; }} />
-                        <button title="Replace your file" onClick={e => { e.stopPropagation(); reuploadRef.current?.click(); }}
-                                className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white/20 hover:text-[#FFD4CA]/80 hover:bg-[#FFD4CA]/8 transition-all">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                            </svg>
-                        </button>
-                        {!confirmingDelete ? (
-                            <button title="Delete this stem" onClick={e => { e.stopPropagation(); setConfirmingDelete(true); }}
-                                    className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white/20 hover:text-[#FF4439]/80 hover:bg-[#FF4439]/8 transition-all">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
                         ) : (
-                            <div className="flex items-center gap-1 bg-[#1a0808]/90 border border-[#FF4439]/30 rounded-lg px-2 py-1 animate-[modal-in_0.15s_ease-out]"
-                                 onClick={e => e.stopPropagation()}>
-                                <span className="font-dm text-[10px] text-white/40 whitespace-nowrap">Sure?</span>
-                                <button onClick={() => { setConfirmingDelete(false); onDelete(); }} className="font-dm text-[10px] text-[#FF4439] hover:text-[#FF4439]/80 font-medium px-1 transition-colors">Yes</button>
-                                <button onClick={() => setConfirmingDelete(false)} className="font-dm text-[10px] text-white/30 hover:text-white/60 px-1 transition-colors">No</button>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => setTextOpen(true)} className="px-4 py-2 rounded-lg font-dm text-xs uppercase tracking-widest transition-all" style={{ backgroundColor: rc.dot + '12', border: `1px solid ${rc.dot}35`, color: rc.dot }}>Open Lyrics</button>
                             </div>
                         )}
+                        {contrib.description && <p className="font-dm text-xs text-white/30 truncate">{contrib.description}</p>}
                     </div>
-                )}
+                    {renderControls()}
+                </div>
             </div>
-        </div>
+            {!hasAudio && <LinedPaperModal isOpen={textOpen} onClose={() => setTextOpen(false)} fileUrl={contrib.filePath ?? ''} role={contrib.role} contributor={contrib.user?.name ?? ''} rc={rc} />}
+        </>
     );
 }
 
@@ -1101,128 +988,123 @@ interface MasterTrackProps {
     isMobile: boolean;
 }
 
-function MasterTrack({ url: _url, isPlaying, progress, duration, currentTime, onToggle, onSeek, volume, onVolume, isMobile }: MasterTrackProps) {
-    const barCount = isMobile ? 32 : 64;
-    const bars = useMemo(() => generateBars(999, barCount), [barCount]);
+function MasterTrack({ url, isPlaying, progress, duration, currentTime, onToggle, onSeek, volume, onVolume, isMobile }: MasterTrackProps) {
+    const bars = useMemo(() => generateBars(999, isMobile ? 32 : 64), [isMobile]);
 
     return (
         <div className="relative rounded-2xl overflow-hidden border mb-6 sm:mb-8 transition-all duration-300"
              style={{
                  borderColor: isPlaying ? 'rgba(255,68,57,0.4)' : 'rgba(255,255,255,0.07)',
                  background: isPlaying ? 'rgba(255,68,57,0.05)' : 'rgba(255,255,255,0.02)',
-                 boxShadow: isPlaying ? '0 0 40px rgba(255,68,57,0.12)' : 'none',
              }}>
             <div className="h-[2px]" style={{ background: 'linear-gradient(90deg, #FF4439, #FFD4CA, #475B5A)' }} />
-            {isPlaying && (
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    <div className="absolute inset-y-0 w-[60%] opacity-[0.03]"
-                         style={{ background: 'linear-gradient(90deg, transparent, #FF4439, transparent)', animation: 'scan-line 2s linear infinite' }} />
-                </div>
-            )}
-
-            <div className="px-4 sm:px-6 py-3 sm:py-4">
-                {isMobile ? (
-                    /* ── Mobile master layout ── */
-                    <div className="flex flex-col gap-2.5">
-                        {/* Row 1: label + play + volume */}
-                        <div className="flex items-center gap-3">
-                            <div className="shrink-0">
-                                <p className="font-dm text-[9px] text-[#FF4439]/60 uppercase tracking-[0.25em] mb-1">Master Mix</p>
-                                <button onClick={onToggle}
-                                        className="w-9 h-9 rounded-full flex items-center justify-center transition-all"
-                                        style={isPlaying
-                                            ? { background: 'linear-gradient(135deg,#FF4439,#B72F30)', color:'#fff', boxShadow:'0 0 16px rgba(255,68,57,0.35)' }
-                                            : { backgroundColor:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)' }}>
-                                    {isPlaying
-                                        ? <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
-                                        : <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-                                </button>
-                            </div>
-                            {/* Volume — compact on mobile */}
-                            <div className="flex items-center gap-2 ml-auto shrink-0">
-                                <svg className="w-3.5 h-3.5 text-white/20" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-                                </svg>
-                                <input type="range" min="0" max="1" step="0.01" value={volume}
-                                       onChange={e => onVolume(parseFloat(e.target.value))}
-                                       className="w-16 accent-[#FF4439]" />
-                            </div>
-                        </div>
-                        {/* Row 2: waveform */}
-                        <div className="flex items-end gap-[2px] h-10 cursor-pointer" onClick={onToggle}>
-                            {bars.map((h, i) => {
-                                const inProg = isPlaying && (i / bars.length) < progress;
-                                return (
-                                    <div key={i} className={isPlaying ? 'bar-playing' : ''}
-                                         style={{ width: 3, height:`${h}%`, borderRadius:2, flexShrink:0,
-                                             backgroundColor: inProg ? '#FF4439' : 'rgba(255,68,57,0.2)',
-                                             transition:'background-color 0.1s',
-                                             animationDelay: isPlaying ? `${(i%8)*0.05}s`:'0s',
-                                             animationDuration: isPlaying ? `${0.3+(i%5)*0.08}s`:'0s' }} />
-                                );
-                            })}
-                        </div>
-                        {/* Row 3: seek + time */}
-                        <div className="flex items-center gap-3">
-                            <div className="flex-1 h-[3px] rounded-full bg-white/[0.06] cursor-pointer overflow-hidden" onClick={onSeek}>
-                                <div className="h-full rounded-full bg-[#FF4439] transition-all duration-100"
-                                     style={{ width:`${isPlaying ? progress*100 : 0}%` }} />
-                            </div>
-                            <span className="font-dm text-[10px] text-white/25 tabular-nums shrink-0">
-                                {isPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
-                            </span>
-                        </div>
-                    </div>
-                ) : (
-                    /* ── Desktop master layout ── */
-                    <div className="flex items-center gap-4">
-                        <div className="shrink-0">
+            <div className="px-4 sm:px-6 py-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="shrink-0 flex items-center gap-4">
+                        <div>
                             <p className="font-dm text-[9px] text-[#FF4439]/60 uppercase tracking-[0.25em] mb-1">Master Mix</p>
                             <button onClick={onToggle}
                                     className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-                                    style={isPlaying
-                                        ? { background: 'linear-gradient(135deg,#FF4439,#B72F30)', color:'#fff', boxShadow:'0 0 20px rgba(255,68,57,0.35)' }
-                                        : { backgroundColor:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)' }}>
-                                {isPlaying
-                                    ? <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
-                                    : <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
+                                    style={isPlaying ? { background: 'linear-gradient(135deg,#FF4439,#B72F30)', color:'#fff' } : { backgroundColor:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)' }}>
+                                {isPlaying ? <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg> : <svg className="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
                             </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-end gap-[2px] h-12 mb-2 cursor-pointer" onClick={onToggle}>
-                                {bars.map((h, i) => {
-                                    const inProg = isPlaying && (i / bars.length) < progress;
-                                    return (
-                                        <div key={i} className={isPlaying ? 'bar-playing' : ''}
-                                             style={{ width: 3, height:`${h}%`, borderRadius:2, flexShrink:0,
-                                                 backgroundColor: inProg ? '#FF4439' : 'rgba(255,68,57,0.2)',
-                                                 transition:'background-color 0.1s',
-                                                 animationDelay: isPlaying ? `${(i%8)*0.05}s`:'0s',
-                                                 animationDuration: isPlaying ? `${0.3+(i%5)*0.08}s`:'0s' }} />
-                                    );
-                                })}
+                        {!isMobile && (
+                            <div className="flex flex-col gap-2">
+                                <svg className="w-3.5 h-3.5 text-white/20" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+                                <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e => onVolume(parseFloat(e.target.value))} className="w-20 accent-[#FF4439]" title={`Volume: ${Math.round(volume*100)}%`} />
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="flex-1 h-[3px] rounded-full bg-white/[0.06] cursor-pointer overflow-hidden" onClick={onSeek}>
-                                    <div className="h-full rounded-full bg-[#FF4439] transition-all duration-100"
-                                         style={{ width:`${isPlaying ? progress*100 : 0}%` }} />
-                                </div>
-                                <span className="font-dm text-[10px] text-white/25 tabular-nums w-[90px] text-right shrink-0">
-                                    {isPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(duration)}
-                                </span>
-                            </div>
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-end gap-[2px] h-12 mb-2 cursor-pointer" onClick={onToggle}>
+                            {bars.map((h, i) => (
+                                <div key={i} className={isPlaying ? 'bar-playing' : ''}
+                                     style={{ width: 3, height:`${h}%`, borderRadius:2, flexShrink:0,
+                                         backgroundColor: (isPlaying && (i / bars.length) < progress) ? '#FF4439' : 'rgba(255,68,57,0.2)',
+                                         transition:'background-color 0.1s' }} />
+                            ))}
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <svg className="w-3.5 h-3.5 text-white/20" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-                            </svg>
-                            <input type="range" min="0" max="1" step="0.01" value={volume}
-                                   onChange={e => onVolume(parseFloat(e.target.value))}
-                                   className="w-20 accent-[#FF4439]" />
+                        <div className="flex items-center gap-3">
+                            <div className="flex-1 h-[3px] rounded-full bg-white/[0.06] cursor-pointer overflow-hidden relative" onClick={onSeek}>
+                                <div className="h-full rounded-full bg-[#FF4439]" style={{ width:`${progress*100}%` }} />
+                            </div>
+                            <span className="font-dm text-[10px] text-white/25 tabular-nums w-[100px] text-right">
+                                {isPlaying ? `${formatTime(currentTime)} / ${formatTime(duration)}` : `Master (${formatTime(duration)})`}
+                            </span>
                         </div>
                     </div>
-                )}
+                    {/* Hidden URL usage to satisfy TS/ESLint if not using for anything else yet */}
+                    <span className="hidden">{url}</span>
+                </div>
             </div>
         </div>
+    );
+}
+
+// ─── LINED PAPER MODAL ────────────────────────────────────────────────────────
+
+interface LinedPaperProps {
+    isOpen: boolean; onClose: () => void;
+    fileUrl: string; role: string; contributor: string;
+    rc: { label: string; dot: string; glow: string };
+}
+
+function LinedPaperModal({ isOpen, onClose, fileUrl, role, contributor, rc }: LinedPaperProps) {
+    const [content, setContent] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        if (!isOpen || !fileUrl) return;
+
+        const loadContent = async () => {
+            setLoading(true);
+            try {
+                const r = await fetch(fileUrl);
+                const t = await r.text();
+                if (isMounted) setContent(t);
+            } catch (e) {
+                console.error("Content load failed", e);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        loadContent();
+        return () => { isMounted = false; };
+    }, [isOpen, fileUrl]);
+
+    if (!isOpen) return null;
+
+    // Use createPortal to render the modal at the end of document.body
+    return createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-10" onClick={onClose}>
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" />
+            <div className="relative w-full max-w-2xl max-h-[85dvh] flex flex-col animate-[paper-pop-in_0.4s_cubic-bezier(0.34,1.56,0.64,1)]" onClick={e => e.stopPropagation()}>
+                {/* ... rest of your existing modal JSX ... */}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-20 h-10 z-20 opacity-90"
+                     style={{ background: 'linear-gradient(135deg, rgba(255,235,180,0.9), rgba(255,220,120,0.7))', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', transform: 'rotate(-1deg)' }} />
+                <div className="relative flex-1 bg-[#fdfaf2] rounded-sm overflow-hidden flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.5)] border border-[#222]/5">
+                    {/* ... (Keep the rest as is) ... */}
+                    <div className="h-14 border-b border-[#222]/10 flex items-center justify-between px-8 bg-[#fdfaf2] z-10">
+                        <span className="font-caveat text-xl" style={{ color: rc.dot }}>{role} • <span className="opacity-60">{contributor}</span></span>
+                        <button onClick={onClose} className="text-[#3a3020]/40 hover:text-[#3a3020] transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto relative p-8 sm:p-12 no-scrollbar" style={{ background: 'linear-gradient(160deg, #fdfaf2 0%, #f7f1e3 100%)' }}>
+                        <div className="absolute top-0 bottom-0 left-12 sm:left-20 w-[1px] bg-[#f00]/15" />
+                        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(transparent, transparent 31px, rgba(100,120,180,0.08) 31px, rgba(100,120,180,0.08) 32px)', marginTop: '12px' }} />
+                        <div className="relative z-10 ml-8 sm:ml-16">
+                            {loading ? (
+                                <div className="py-12 font-caveat text-2xl" style={{ color: rc.dot, opacity: 0.3 }}>Unfolding lyrics...</div>
+                            ) : (
+                                <pre className="font-caveat text-2xl sm:text-3xl text-[#2a2010] leading-[32px] whitespace-pre-wrap break-words animate-[ink-fade-in_0.8s_ease-out]">{content}</pre>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>,
+        document.body // This targets the very end of the HTML body
     );
 }
