@@ -21,6 +21,16 @@ interface ThreadSummary {
     rolesWithContributors: { [role: string]: string[] };
 }
 
+interface ContributionResponse {
+    id: number;
+    role: string;
+    noolId: number;
+    noolTitle: string;
+    description: string;
+    filePath: string;
+    createdAt: string;
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const ROLE_COLORS: Record<string, { dot: string; bg: string; text: string; glow: string }> = {
@@ -263,23 +273,29 @@ function RoleDNA({ threads }: { threads: ThreadSummary[] }) {
 export default function ProfilePage() {
     const navigate = useNavigate();
 
-    const [userName,     setUserName]     = useState<string>('?');
-    const [userEmail,    setUserEmail]    = useState<string>('');
-    const [threads,      setThreads]      = useState<ThreadSummary[]>([]);
-    const [isLoading,    setIsLoading]    = useState(true);
-    const [isReady,      setIsReady]      = useState(false);
+    const [userName, setUserName] = useState<string>('?');
+    const [userEmail, setUserEmail] = useState<string>('');
+    const [threads, setThreads] = useState<ThreadSummary[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isReady, setIsReady] = useState(false);
     const [isFirstVisit, setIsFirstVisit] = useState(false);
+    const [myStems, setMyStems] = useState<ContributionResponse[]>([]);
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeletingProfile, setIsDeletingProfile] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (!token) { navigate('/auth'); return; }
+        if (!token) {
+            navigate('/auth');
+            return;
+        }
         try {
             const payload = JSON.parse(atob(token.split('.')[1]));
             setUserEmail(payload.sub || '');
-        } catch { navigate('/auth'); }
+        } catch {
+            navigate('/auth');
+        }
         if (!sessionStorage.getItem('profileAnimated')) {
             setIsFirstVisit(true);
             sessionStorage.setItem('profileAnimated', 'true');
@@ -295,7 +311,7 @@ export default function ProfilePage() {
         try {
             // Hit the new optimized VIP endpoint
             const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             });
 
             const profile = res.data; // This is now a UserProfileResponse object
@@ -305,8 +321,7 @@ export default function ProfilePage() {
             setUserName(profile.name || '?');
             setUserEmail(profile.email || '');
 
-            // If you ever want to show "My Contributions to Other Threads" in the future,
-            // you now have access to it here via: profile.contributions
+            setMyStems(profile.contributions || []);
 
         } catch (error) {
             console.error('Failed to load profile', error);
@@ -320,7 +335,9 @@ export default function ProfilePage() {
     }, [navigate]);
 
     // UPDATE the useEffect to call the new function
-    useEffect(() => { fetchMyProfile(); }, [fetchMyProfile]);
+    useEffect(() => {
+        fetchMyProfile();
+    }, [fetchMyProfile]);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -345,20 +362,22 @@ export default function ProfilePage() {
         }
     };
 
-    const totalStems          = threads.reduce((sum, t) => sum + t.contributionCount, 0);
+    const totalStems = threads.reduce((sum, t) => sum + t.contributionCount, 0);
     const uniqueCollaborators = new Set(threads.flatMap(t => Object.values(t.rolesWithContributors).flat())).size;
 
-    const countThreads = useCountUp(isLoading ? 0 : threads.length,       1200, 700);
-    const countStems   = useCountUp(isLoading ? 0 : totalStems,            1400, 800);
-    const countCollabs = useCountUp(isLoading ? 0 : uniqueCollaborators,   1100, 900);
+    const countThreads = useCountUp(isLoading ? 0 : threads.length, 1200, 700);
+    const countStems = useCountUp(isLoading ? 0 : totalStems, 1400, 800);
+    const countCollabs = useCountUp(isLoading ? 0 : uniqueCollaborators, 1100, 900);
 
-    const initial   = getInitial(userName);
+    const initial = getInitial(userName);
 
 
     return (
         <div className="min-h-screen bg-[#060808] text-[#FCFCFC] overflow-x-hidden">
 
-            <link href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+            <link
+                href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap"
+                rel="stylesheet"/>
 
             <style>{`
                 .font-anton  { font-family: 'Anton', sans-serif; }
@@ -382,29 +401,42 @@ export default function ProfilePage() {
             {/* AMBIENT BACKGROUND */}
             <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute top-[-15%] left-[-8%] w-[700px] h-[700px] rounded-full"
-                     style={{ background: 'radial-gradient(circle, rgba(71,91,90,0.12) 0%, transparent 65%)', animation: 'glow-breathe 6s ease-in-out infinite' }} />
+                     style={{
+                         background: 'radial-gradient(circle, rgba(71,91,90,0.12) 0%, transparent 65%)',
+                         animation: 'glow-breathe 6s ease-in-out infinite'
+                     }}/>
                 <div className="absolute bottom-[-10%] right-[-8%] w-[500px] h-[500px] rounded-full"
-                     style={{ background: 'radial-gradient(circle, rgba(255,68,57,0.07) 0%, transparent 65%)', animation: 'glow-breathe 4s ease-in-out 2s infinite' }} />
+                     style={{
+                         background: 'radial-gradient(circle, rgba(255,68,57,0.07) 0%, transparent 65%)',
+                         animation: 'glow-breathe 4s ease-in-out 2s infinite'
+                     }}/>
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-[340px]"
-                     style={{ background: 'linear-gradient(to bottom, rgba(255,68,57,0.3), transparent)', animation: 'spotlight 5s ease-in-out infinite' }} />
+                     style={{
+                         background: 'linear-gradient(to bottom, rgba(255,68,57,0.3), transparent)',
+                         animation: 'spotlight 5s ease-in-out infinite'
+                     }}/>
             </div>
 
             {/* ── NAVBAR ──────────────────────────────────────────────────────── */}
             <nav className="sticky top-0 z-50 bg-[#060808]/70 backdrop-blur-2xl border-b border-white/[0.05]"
-                 style={{ animation: 'fade-in 0.4s ease-out both' }}>
+                 style={{animation: 'fade-in 0.4s ease-out both'}}>
                 <div className="max-w-[1100px] mx-auto px-6 h-14 flex items-center justify-between">
                     <button onClick={() => navigate('/home')}
                             className="flex items-center gap-2 text-white/25 hover:text-white/70 font-dm text-sm transition-all duration-200 group">
-                        <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-200"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/>
                         </svg>
                         Feed
                     </button>
-                    <span className="font-anton text-lg tracking-widest text-white/10 uppercase select-none">Aalap</span>
+                    <span
+                        className="font-anton text-lg tracking-widest text-white/10 uppercase select-none">Aalap</span>
                     <button onClick={handleLogout}
                             className="flex items-center gap-2 font-dm text-[11px] text-white/20 hover:text-[#FF4439]/70 uppercase tracking-widest transition-all duration-200 group">
-                        <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
                         Logout
                     </button>
@@ -412,11 +444,12 @@ export default function ProfilePage() {
             </nav>
 
             {/* ── HERO ────────────────────────────────────────────────────────── */}
-            <div className="relative overflow-hidden" style={{ minHeight: 340 }}>
-                <FloatingNotes />
+            <div className="relative overflow-hidden" style={{minHeight: 340}}>
+                <FloatingNotes/>
 
                 {/* Giant background initial */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+                <div
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
                     <span className="font-anton leading-none"
                           style={{
                               fontSize: 'clamp(200px, 35vw, 420px)',
@@ -431,17 +464,20 @@ export default function ProfilePage() {
 
                 <div className="relative z-10 flex flex-col items-center pt-14 pb-10">
                     {/* Waveform avatar */}
-                    <div style={{ animation: isFirstVisit ? 'fade-up 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' : undefined }}>
-                        <WaveformAvatar initial={initial} isReady={isReady} />
+                    <div
+                        style={{animation: isFirstVisit ? 'fade-up 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' : undefined}}>
+                        <WaveformAvatar initial={initial} isReady={isReady}/>
                     </div>
 
                     {/* Name — char by char drop */}
                     {/* Name — char by char drop, word-grouped to prevent mid-word line breaks */}
-                    <div className="flex flex-wrap justify-center items-end gap-x-[0.25em] gap-y-0 mt-4 w-full px-6 overflow-y-hidden" style={{ lineHeight: 1 }}>
+                    <div
+                        className="flex flex-wrap justify-center items-end gap-x-[0.25em] gap-y-0 mt-4 w-full px-6 overflow-y-hidden"
+                        style={{lineHeight: 1}}>
                         {userName !== '?' && userName.split(' ').map((word, wi, words) => {
                             const charOffset = words.slice(0, wi).reduce((acc, w) => acc + w.length + 1, 0);
                             return (
-                                <span key={wi} className="inline-flex items-end" style={{ whiteSpace: 'nowrap' }}>
+                                <span key={wi} className="inline-flex items-end" style={{whiteSpace: 'nowrap'}}>
                                     {word.split('').map((char, ci) => (
                                         <span key={ci} className="font-anton tracking-wide uppercase"
                                               style={{
@@ -465,17 +501,20 @@ export default function ProfilePage() {
                              background: 'linear-gradient(90deg, transparent, #FF4439, transparent)',
                              animation: isFirstVisit ? 'name-line 0.6s ease-out 0.8s both' : undefined,
                              transformOrigin: 'center',
-                         }} />
+                         }}/>
 
                     <p className="font-dm text-sm text-white/20 mt-3 tracking-wide"
-                       style={{ animation: isFirstVisit ? 'fade-up 0.5s ease-out 0.85s both' : undefined }}>
+                       style={{animation: isFirstVisit ? 'fade-up 0.5s ease-out 0.85s both' : undefined}}>
                         {userEmail}
                     </p>
 
                     <div className="flex items-center gap-2 mt-2"
-                         style={{ animation: isFirstVisit ? 'fade-up 0.5s ease-out 0.95s both' : undefined }}>
+                         style={{animation: isFirstVisit ? 'fade-up 0.5s ease-out 0.95s both' : undefined}}>
                         <span className="w-1.5 h-1.5 rounded-full bg-[#FF4439]"
-                              style={{ animation: 'glow-breathe 2s ease-in-out infinite', boxShadow: '0 0 6px rgba(255,68,57,0.8)' }} />
+                              style={{
+                                  animation: 'glow-breathe 2s ease-in-out infinite',
+                                  boxShadow: '0 0 6px rgba(255,68,57,0.8)'
+                              }}/>
                         <span className="font-dm text-[10px] uppercase tracking-[0.35em] text-[#FF4439]/50">
                             Aalap Artist
                         </span>
@@ -485,21 +524,22 @@ export default function ProfilePage() {
 
             {/* ── STATS BAR ───────────────────────────────────────────────────── */}
             <div className="relative z-10 border-y border-white/[0.05]"
-                 style={{ background: 'linear-gradient(90deg, rgba(71,91,90,0.05), rgba(255,68,57,0.03), rgba(71,91,90,0.05))' }}>
+                 style={{background: 'linear-gradient(90deg, rgba(71,91,90,0.05), rgba(255,68,57,0.03), rgba(71,91,90,0.05))'}}>
                 <div className="max-w-[1100px] mx-auto px-6">
                     <div className="grid grid-cols-3 divide-x divide-white/[0.05]">
                         {[
-                            { label: 'Threads',       value: countThreads, accent: '#FFD4CA', delay: '0.55s' },
-                            { label: 'Total Stems',   value: countStems,   accent: '#FF4439', delay: '0.65s' },
-                            { label: 'Collaborators', value: countCollabs, accent: '#8BAFAE', delay: '0.75s' },
+                            {label: 'Threads', value: countThreads, accent: '#FFD4CA', delay: '0.55s'},
+                            {label: 'Total Stems', value: countStems, accent: '#FF4439', delay: '0.65s'},
+                            {label: 'Collaborators', value: countCollabs, accent: '#8BAFAE', delay: '0.75s'},
                         ].map((stat) => (
                             <div key={stat.label}
                                  className="group relative flex flex-col items-center py-8 cursor-default border border-transparent hover:border-[#FF4439]/10 transition-all duration-300 rounded-none"
-                                 style={{ animation: isFirstVisit ? `stat-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${stat.delay} both` : undefined }}>
-                                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                                     style={{ background: `radial-gradient(ellipse 120px 80px at 50% 100%, ${stat.accent}08 0%, transparent 70%)` }} />
+                                 style={{animation: isFirstVisit ? `stat-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) ${stat.delay} both` : undefined}}>
+                                <div
+                                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                                    style={{background: `radial-gradient(ellipse 120px 80px at 50% 100%, ${stat.accent}08 0%, transparent 70%)`}}/>
                                 <p className="font-anton text-4xl sm:text-5xl md:text-6xl leading-none tabular-nums group-hover:scale-105 transition-transform duration-200"
-                                   style={{ color: stat.accent, textShadow: `0 0 30px ${stat.accent}40` }}>
+                                   style={{color: stat.accent, textShadow: `0 0 30px ${stat.accent}40`}}>
                                     {isLoading ? '—' : stat.value}
                                 </p>
                                 <p className="font-dm text-[9px] sm:text-[10px] uppercase tracking-[0.15em] sm:tracking-[0.25em] text-white/20 mt-2 text-center">
@@ -514,14 +554,14 @@ export default function ProfilePage() {
             {/* ── BODY ────────────────────────────────────────────────────────── */}
             <div className="relative z-10 max-w-[1100px] mx-auto px-6 pt-12 pb-28">
 
-                {!isLoading && <RoleDNA threads={threads} />}
+                {!isLoading && <RoleDNA threads={threads}/>}
 
                 {/* Section header */}
                 <div className="flex items-center gap-4 mb-8"
-                     style={{ animation: isFirstVisit ? 'fade-up 0.5s ease-out 1s both' : undefined }}>
+                     style={{animation: isFirstVisit ? 'fade-up 0.5s ease-out 1s both' : undefined}}>
                     <div className="flex items-center gap-3 flex-1">
                         <div className="w-6 h-[1px]"
-                             style={{ background: 'linear-gradient(90deg, #FF4439, rgba(255,68,57,0))' }} />
+                             style={{background: 'linear-gradient(90deg, #FF4439, rgba(255,68,57,0))'}}/>
                         <p className="font-dm text-[10px] uppercase tracking-[0.35em] text-white/25">My Threads</p>
                     </div>
                     {!isLoading && threads.length > 0 && (
@@ -536,20 +576,22 @@ export default function ProfilePage() {
                 {isLoading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="rounded-2xl border border-white/[0.04] bg-white/[0.015] p-6 animate-pulse"
-                                 style={{ opacity: 1 - i * 0.18 }}>
-                                <div className="h-6 bg-white/[0.05] rounded-lg w-2/3 mb-4" />
-                                <div className="h-3 bg-white/[0.03] rounded w-full mb-2" />
-                                <div className="h-3 bg-white/[0.03] rounded w-3/4 mb-5" />
+                            <div key={i}
+                                 className="rounded-2xl border border-white/[0.04] bg-white/[0.015] p-6 animate-pulse"
+                                 style={{opacity: 1 - i * 0.18}}>
+                                <div className="h-6 bg-white/[0.05] rounded-lg w-2/3 mb-4"/>
+                                <div className="h-3 bg-white/[0.03] rounded w-full mb-2"/>
+                                <div className="h-3 bg-white/[0.03] rounded w-3/4 mb-5"/>
                                 <div className="flex gap-2 mb-5">
-                                    {[1,2,3].map(j => <div key={j} className="h-5 w-16 bg-white/[0.04] rounded-md" />)}
+                                    {[1, 2, 3].map(j => <div key={j} className="h-5 w-16 bg-white/[0.04] rounded-md"/>)}
                                 </div>
-                                <div className="h-px bg-white/[0.04] mb-4" />
+                                <div className="h-px bg-white/[0.04] mb-4"/>
                                 <div className="flex justify-between">
                                     <div className="flex -space-x-1">
-                                        {[1,2,3].map(j => <div key={j} className="w-6 h-6 rounded-full bg-white/[0.05]" />)}
+                                        {[1, 2, 3].map(j => <div key={j}
+                                                                 className="w-6 h-6 rounded-full bg-white/[0.05]"/>)}
                                     </div>
-                                    <div className="h-6 w-20 bg-white/[0.04] rounded-lg" />
+                                    <div className="h-6 w-20 bg-white/[0.04] rounded-lg"/>
                                 </div>
                             </div>
                         ))}
@@ -557,19 +599,23 @@ export default function ProfilePage() {
 
                 ) : threads.length === 0 ? (
                     <div className="py-28 flex flex-col items-center"
-                         style={{ animation: 'fade-up 0.5s ease-out 0.3s both' }}>
-                        <div className="w-20 h-20 rounded-full border border-white/[0.05] flex items-center justify-center mb-6"
-                             style={{ background: 'radial-gradient(circle, rgba(255,68,57,0.05) 0%, transparent 70%)' }}>
-                            <svg className="w-8 h-8 text-white/10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                         style={{animation: 'fade-up 0.5s ease-out 0.3s both'}}>
+                        <div
+                            className="w-20 h-20 rounded-full border border-white/[0.05] flex items-center justify-center mb-6"
+                            style={{background: 'radial-gradient(circle, rgba(255,68,57,0.05) 0%, transparent 70%)'}}>
+                            <svg className="w-8 h-8 text-white/10" fill="none" stroke="currentColor"
+                                 viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
+                                      d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
                             </svg>
                         </div>
                         <p className="font-dm text-white/20 italic text-base mb-2">No threads yet.</p>
                         <p className="font-dm text-white/10 text-sm mb-8">Plant the first seed. Let others grow it.</p>
                         <button onClick={() => navigate('/home')}
                                 className="group relative font-anton text-sm tracking-[0.2em] uppercase px-8 py-3.5 rounded-xl overflow-hidden border border-[#FF4439]/30 text-[#FF4439]/60 hover:text-white transition-colors duration-300">
-                            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out"
-                                 style={{ background: 'linear-gradient(90deg, #B72F30, #FF4439)' }} />
+                            <div
+                                className="absolute inset-0 -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out"
+                                style={{background: 'linear-gradient(90deg, #B72F30, #FF4439)'}}/>
                             <span className="relative z-10">Start a Thread</span>
                         </button>
                     </div>
@@ -587,12 +633,37 @@ export default function ProfilePage() {
                         ))}
                     </div>
                 )}
+                {/* ── CONTRIBUTIONS SECTION ── */}
+                {!isLoading && myStems.length > 0 && (
+                    <div className="mt-16 animate-[fade-up_0.5s_ease-out_1.2s_both]">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="flex items-center gap-3 flex-1">
+                                <div className="w-6 h-[1px]"
+                                     style={{background: 'linear-gradient(90deg, #2DD4BF, rgba(45,212,191,0))'}}/>
+                                <p className="font-dm text-[10px] uppercase tracking-[0.35em] text-white/25">My
+                                    Contributions</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {myStems.map((stem) => (
+                                <ContributionCard
+                                    key={stem.id}
+                                    stem={stem}
+                                    onClick={() => navigate(`/threads/${stem.noolId}`)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
             {/* ── DANGER ZONE ──────────────────────────────────────────────────────── */}
             {!isLoading && (
-                <div className="relative z-10 max-w-[1100px] mx-auto px-6 pb-24 pt-10 border-t border-white/[0.05] flex flex-col items-center mt-10">
+                <div
+                    className="relative z-10 max-w-[1100px] mx-auto px-6 pb-24 pt-10 border-t border-white/[0.05] flex flex-col items-center mt-10">
                     <p className="font-dm text-sm text-white/30 mb-5 text-center max-w-md">
-                        If you wish to remove your presence, your threads, and your stems from Aalap entirely, you can choose to leave.
+                        If you wish to remove your presence, your threads, and your stems from Aalap entirely, you can
+                        choose to leave.
                     </p>
                     <button onClick={() => setIsDeleteModalOpen(true)}
                             className="font-anton text-sm tracking-[0.2em] uppercase text-[#FF4439]/60 hover:text-[#FF4439] border border-[#FF4439]/30 hover:border-[#FF4439] hover:bg-[#FF4439]/10 px-8 py-3.5 rounded-xl transition-all duration-300">
@@ -604,12 +675,16 @@ export default function ProfilePage() {
             {/* ── DELETE CONFIRMATION MODAL ────────────────────────────────────────── */}
             {isDeleteModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !isDeletingProfile && setIsDeleteModalOpen(false)} />
-                    <div className="relative z-10 w-full max-w-[420px] bg-[#080C0B] border border-[#FF4439]/30 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#FF4439]/10"
-                         style={{ animation: 'fade-up 0.25s ease-out both' }}>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                         onClick={() => !isDeletingProfile && setIsDeleteModalOpen(false)}/>
+                    <div
+                        className="relative z-10 w-full max-w-[420px] bg-[#080C0B] border border-[#FF4439]/30 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#FF4439]/10"
+                        style={{animation: 'fade-up 0.25s ease-out both'}}>
                         <h3 className="font-anton text-3xl uppercase tracking-wide text-white mb-2">Leave Aalap?</h3>
                         <p className="font-dm text-sm text-white/50 mb-8 leading-relaxed">
-                            This will permanently delete your account, <strong className="text-white">all sessions</strong> you've started, and <strong className="text-white">all stems</strong> you've contributed to other threads. This action cannot be undone.
+                            This will permanently delete your account, <strong className="text-white">all
+                            sessions</strong> you've started, and <strong className="text-white">all
+                            stems</strong> you've contributed to other threads. This action cannot be undone.
                         </p>
                         <div className="flex flex-col gap-3">
                             <button onClick={handleLeaveAalap} disabled={isDeletingProfile}
@@ -624,6 +699,36 @@ export default function ProfilePage() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+function ContributionCard({ stem, onClick }: { stem: ContributionResponse; onClick: () => void }) {
+    const rc = getRoleColor(stem.role);
+
+    return (
+        <div
+            onClick={onClick}
+            className="group relative bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 cursor-pointer hover:border-[#FF4439]/30 transition-all"
+        >
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                        <span className="font-anton text-[10px] tracking-widest uppercase" style={{ color: rc.dot }}>
+                            {stem.role.split(' - ')[0]}
+                        </span>
+                        <span className="text-[10px] text-white/20">•</span>
+                        <span className="font-dm text-[10px] text-white/40 uppercase tracking-wider truncate max-w-[120px]">
+                            {stem.noolTitle}
+                        </span>
+                    </div>
+                    <p className="font-dm text-sm text-white/70 line-clamp-1">
+                        {stem.description || "Added to thread"}
+                    </p>
+                </div>
+                <span className="font-dm text-[9px] text-white/20 uppercase tracking-widest whitespace-nowrap">
+                    {timeAgo(stem.createdAt)}
+                </span>
+            </div>
         </div>
     );
 }

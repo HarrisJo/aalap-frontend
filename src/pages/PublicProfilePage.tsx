@@ -11,6 +11,16 @@ interface ThreadSummary {
     rolesWithContributors: { [role: string]: string[] };
 }
 
+interface ContributionResponse {
+    id: number;
+    role: string;
+    noolId: number;
+    noolTitle: string;
+    description: string;
+    filePath: string;
+    createdAt: string;
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const ROLE_COLORS: Record<string, { dot: string; bg: string; text: string; glow: string }> = {
@@ -153,6 +163,8 @@ export default function PublicProfilePage() {
     const [isLoading,    setIsLoading]    = useState(true);
     const [isReady,      setIsReady]      = useState(false);
 
+    const [myStems, setMyStems] = useState<ContributionResponse[]>([]);
+
     // Fetch the specific user's profile based on the URL ID
     const fetchPublicProfile = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -167,6 +179,7 @@ export default function PublicProfilePage() {
             setThreads(profile.threadsCreated || []);
             setUserName(profile.name || '?');
             setUserEmail(profile.email || '');
+            setMyStems(profile.contributions || []);
 
         } catch (error) {
             console.error('Failed to load public profile', error);
@@ -289,6 +302,27 @@ export default function PublicProfilePage() {
                         ))}
                     </div>
                 )}
+                {/* ── CONTRIBUTIONS SECTION ── */}
+                {!isLoading && myStems.length > 0 && (
+                    <div className="mt-16 animate-[fade-up_0.5s_ease-out_1s_both]">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="flex items-center gap-3 flex-1">
+                                <div className="w-6 h-[1px]" style={{ background: 'linear-gradient(90deg, #2DD4BF, rgba(45,212,191,0))' }} />
+                                <p className="font-dm text-[10px] uppercase tracking-[0.35em] text-white/25">Contributions</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {myStems.map((stem) => (
+                                <ContributionCard
+                                    key={stem.id}
+                                    stem={stem}
+                                    onClick={() => navigate(`/threads/${stem.noolId}`)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -301,7 +335,36 @@ interface ProfileThreadCardProps {
     isFirstVisit: boolean;
     onClick: () => void;
 }
+function ContributionCard({ stem, onClick }: { stem: ContributionResponse; onClick: () => void }) {
+    const rc = getRoleColor(stem.role);
 
+    return (
+        <div
+            onClick={onClick}
+            className="group relative bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 cursor-pointer hover:border-[#FF4439]/30 transition-all"
+        >
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                        <span className="font-anton text-[10px] tracking-widest uppercase" style={{ color: rc.dot }}>
+                            {stem.role.split(' - ')[0]}
+                        </span>
+                        <span className="text-[10px] text-white/20">•</span>
+                        <span className="font-dm text-[10px] text-white/40 uppercase tracking-wider truncate max-w-[120px]">
+                            {stem.noolTitle}
+                        </span>
+                    </div>
+                    <p className="font-dm text-sm text-white/70 line-clamp-1">
+                        {stem.description || "Added to thread"}
+                    </p>
+                </div>
+                <span className="font-dm text-[9px] text-white/20 uppercase tracking-widest whitespace-nowrap">
+                    {timeAgo(stem.createdAt)}
+                </span>
+            </div>
+        </div>
+    );
+}
 function ProfileThreadCard({ thread, index, isFirstVisit, onClick }: ProfileThreadCardProps) {
     const roles           = Object.keys(thread.rolesWithContributors);
     const allContributors = Object.values(thread.rolesWithContributors).flat();
