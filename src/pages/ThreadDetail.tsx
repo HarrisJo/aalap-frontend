@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { getDetailRoleColor } from '../utils/roleColors';
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface UserInfo { id: number; name: string; }
+interface UserInfo { id: number; name: string; gravatarUrl?: string; }
 
 interface Contribution {
     id: number; role: string; user?: UserInfo;
@@ -882,8 +882,12 @@ function StemTrack({
                     <div className="flex flex-col p-3 gap-2">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <button onClick={onCreatorClick} className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center font-anton text-[10px]" style={{ backgroundColor: rc.dot + '20', border: `1px solid ${rc.dot}50`, color: rc.dot }}>
-                                    {getInitial(contrib.user?.name)}
+                                <button onClick={onCreatorClick} className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center font-anton text-[10px] overflow-hidden" style={{ backgroundColor: rc.dot + '20', border: `1px solid ${rc.dot}50`, color: rc.dot }}>
+                                    {contrib.user?.gravatarUrl ? (
+                                        <img src={contrib.user.gravatarUrl} alt={contrib.user.name}
+                                             className="w-full h-full object-cover rounded-full"
+                                             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                    ) : getInitial(contrib.user?.name)}
                                 </button>
                                 <div className="min-w-0">
                                     <span className="font-anton text-[9px] tracking-widest uppercase block leading-none" style={{ color: rc.dot }}>{contrib.role.split(' - ')[0]}</span>
@@ -922,8 +926,12 @@ function StemTrack({
                      style={{ backgroundColor: rc.dot, opacity: isPlaying ? 1 : 0.35 }} />
                 <div className="flex items-center gap-4 pl-4 pr-4 py-3">
                     <div className="flex items-center gap-3 w-[180px] shrink-0">
-                        <button onClick={onCreatorClick} className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-anton text-sm transition-all hover:scale-105" style={{ backgroundColor: rc.dot + '20', border: `1.5px solid ${rc.dot}50`, color: rc.dot }}>
-                            {getInitial(contrib.user?.name)}
+                        <button onClick={onCreatorClick} className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-anton text-sm transition-all hover:scale-105 overflow-hidden" style={{ backgroundColor: rc.dot + '20', border: `1.5px solid ${rc.dot}50`, color: rc.dot }}>
+                            {contrib.user?.gravatarUrl ? (
+                                <img src={contrib.user.gravatarUrl} alt={contrib.user.name}
+                                     className="w-full h-full object-cover rounded-full"
+                                     onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            ) : getInitial(contrib.user?.name)}
                         </button>
                         <div className="min-w-0">
                             <span className="font-anton text-[10px] tracking-widest uppercase leading-none block" style={{ color: rc.dot }}>{contrib.role.split(' - ')[0]}</span>

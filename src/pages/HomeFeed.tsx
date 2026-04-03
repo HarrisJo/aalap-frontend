@@ -9,7 +9,7 @@ import { getFeedRoleColor } from '../utils/roleColors';
 interface UserInfo {
   id: number;
   name: string;
-  email: string;
+  gravatarUrl?: string;
 }
 
 interface ThreadSummary {
@@ -697,8 +697,12 @@ function ThreadCard({ thread, index, onClick, onCreatorClick }: ThreadCardProps)
               <div className="w-7 h-7 rounded-full bg-[#1a1a1a]/50 border border-[#475B5A]
                             flex items-center justify-center font-anton text-[11px] text-[#FCFCFC]/60
                             group-hover/creator:border-[#FF4439]/60 group-hover/creator:text-[#FF4439]
-                            group-hover/creator:bg-[#FF4439]/10 transition-all shadow-inner">
-                {getInitial(thread.createdBy.name)}
+                            group-hover/creator:bg-[#FF4439]/10 transition-all shadow-inner overflow-hidden">
+                {thread.createdBy.gravatarUrl ? (
+                  <img src={thread.createdBy.gravatarUrl} alt={thread.createdBy.name}
+                       className="w-full h-full object-cover rounded-full"
+                       onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                ) : getInitial(thread.createdBy.name)}
               </div>
               <div className="flex flex-col items-start">
                 <span className="font-dm text-[10px] text-[#FFD4CA]/50 uppercase tracking-widest leading-none mb-1">Started by</span>

@@ -13,6 +13,7 @@ export default function PublicProfilePage() {
 
     const [userName,  setUserName]  = useState<string>('?');
     const [userEmail, setUserEmail] = useState<string>('');
+    const [gravatarUrl, setGravatarUrl] = useState<string>('');
     const [threads,   setThreads]   = useState<ThreadSummary[]>([]);
     const [myStems,   setMyStems]   = useState<ContributionResponse[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -27,6 +28,7 @@ export default function PublicProfilePage() {
             setThreads(profile.threadsCreated || []);
             setUserName(profile.name || '?');
             setUserEmail(profile.email || '');
+            setGravatarUrl(profile.gravatarUrl || '');
             setMyStems(profile.contributions || []);
         } catch (error) {
             console.error('Failed to load public profile', error);
@@ -88,7 +90,7 @@ export default function PublicProfilePage() {
                 <FloatingNotes />
                 <div className="relative z-10 flex flex-col items-center pt-14 pb-10">
                     <div style={{ animation: 'fade-up 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' }}>
-                        <WaveformAvatar initial={initial} isReady={isReady} />
+                        <WaveformAvatar initial={initial} isReady={isReady} gravatarUrl={gravatarUrl} />
                     </div>
                     <div className="flex flex-wrap justify-center items-end gap-x-[0.25em] gap-y-0 mt-4 w-full px-6 overflow-y-hidden"
                          style={{ lineHeight: 1 }}>

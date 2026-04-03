@@ -19,6 +19,7 @@ export default function ProfilePage() {
 
     const [userName, setUserName] = useState<string>('?');
     const [userEmail, setUserEmail] = useState<string>('');
+    const [gravatarUrl, setGravatarUrl] = useState<string>('');
     const [threads, setThreads] = useState<ThreadSummary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isReady, setIsReady] = useState(false);
@@ -70,6 +71,7 @@ export default function ProfilePage() {
             setThreads(profile.threadsCreated || []);
             setUserName(profile.name || '?');
             setUserEmail(profile.email || '');
+            setGravatarUrl(profile.gravatarUrl || '');
 
             setMyStems(profile.contributions || []);
 
@@ -215,7 +217,7 @@ export default function ProfilePage() {
                     {/* Waveform avatar */}
                     <div
                         style={{animation: isFirstVisit ? 'fade-up 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' : undefined}}>
-                        <WaveformAvatar initial={initial} isReady={isReady}/>
+                        <WaveformAvatar initial={initial} isReady={isReady} gravatarUrl={gravatarUrl}/>
                     </div>
 
                     {/* Name — char by char drop */}

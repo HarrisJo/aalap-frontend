@@ -4,7 +4,7 @@ import { getRoleColor, timeAgo, getInitial } from '../utils/profileUtils';
 
 // ─── WAVEFORM AVATAR ──────────────────────────────────────────────────────────
 
-export function WaveformAvatar({ initial, isReady }: { initial: string; isReady: boolean }) {
+export function WaveformAvatar({ initial, isReady, gravatarUrl }: { initial: string; isReady: boolean; gravatarUrl?: string }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rafRef    = useRef<number>(0);
 
@@ -73,7 +73,16 @@ export function WaveformAvatar({ initial, isReady }: { initial: string; isReady:
                      border: '1.5px solid rgba(255,212,202,0.15)',
                      boxShadow: '0 0 0 1px rgba(255,68,57,0.1), 0 0 40px rgba(255,68,57,0.12), inset 0 1px 0 rgba(255,255,255,0.05)',
                  }}>
-                <span className="font-anton text-5xl" style={{ color: '#FFD4CA' }}>{initial}</span>
+                {gravatarUrl ? (
+                    <img
+                        src={gravatarUrl}
+                        alt={initial}
+                        className="w-full h-full rounded-full object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                ) : (
+                    <span className="font-anton text-5xl" style={{ color: '#FFD4CA' }}>{initial}</span>
+                )}
             </div>
         </div>
     );
