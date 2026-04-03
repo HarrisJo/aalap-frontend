@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ThreadService } from '../services/ThreadService';
+import { getFeedRoleColor } from '../utils/roleColors';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ interface ThreadSummary {
   createdAt: string;
   contributionCount: number;
   rolesWithContributors: { [role: string]: string[] };
+  contributorIds: number[];
 }
 
 interface Toast {
@@ -28,21 +30,7 @@ interface Toast {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-// Redesigned with the new color palette
-const ROLE_COLORS: Record<string, { text: string; bg: string; dot: string }> = {
-  composer:        { text: 'text-[#1a1a1a]',  bg: 'bg-[#FFD4CA]',     dot: '#FFD4CA' }, // Peach
-  lyricist:        { text: 'text-[#FCFCFC]',  bg: 'bg-[#FF4439]',     dot: '#FF4439' }, // Red
-  singer:          { text: 'text-[#FCFCFC]',  bg: 'bg-[#B72F30]',     dot: '#B72F30' }, // Crimson
-  producer:        { text: 'text-[#1a1a1a]',  bg: 'bg-[#FCFCFC]',     dot: '#FCFCFC' }, // White
-  instrumentalist: { text: 'text-[#FCFCFC]',  bg: 'bg-[#475B5A]',     dot: '#475B5A' }, // Teal
-};
-
-const DEFAULT_RC = { text: 'text-[#FCFCFC]/40', bg: 'bg-[#FCFCFC]/5', dot: '#FCFCFC40' };
-
-function getRoleColor(role: string) {
-  const key = role.split(' - ')[0].toLowerCase().trim();
-  return ROLE_COLORS[key] ?? DEFAULT_RC;
-}
+function getRoleColor(role: string) { return getFeedRoleColor(role); }
 
 function getInitial(name?: string) {
   return (name && name !== '?') ? name.charAt(0).toUpperCase() : '?';
@@ -73,6 +61,9 @@ export default function HomeFeed() {
 
   const [threads, setThreads]       = useState<ThreadSummary[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage]    = useState(0);
+  const [totalPages, setTotalPages]      = useState(1);
   const [search, setSearch]         = useState('');
   const [filterRole, setFilterRole] = useState<string | null>(null);
   const [userName, setUserName]     = useState<string>('?');
@@ -86,15 +77,9 @@ export default function HomeFeed() {
   const [isCreating, setIsCreating]         = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUserName(payload.name || payload.username || '?');
-      } catch (e) {
-        console.warn("Failed to parse token payload for user info");
-      }
-    }
+    // Read non-sensitive userName from sessionStorage (set on login).
+    // No JWT decoding needed — the token is in an HttpOnly cookie.
+    setUserName(sessionStorage.getItem('userName') || '?');
   }, []);
 
   const showToast = useCallback((message: string, type: Toast['type']) => {
@@ -104,19 +89,36 @@ export default function HomeFeed() {
   }, []);
 
   const fetchThreads = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) { navigate('/auth'); return; }
+    if (!sessionStorage.getItem('isLoggedIn')) { navigate('/auth'); return; }
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/threads`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setThreads(res.data);
+      // Cookie is sent automatically — no Authorization header needed.
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/threads?page=0&size=20`);
+      setThreads(res.data.content);
+      setCurrentPage(0);
+      setTotalPages(res.data.totalPages);
     } catch {
       showToast('Failed to load feed. Check your connection.', 'error');
     } finally {
       setIsLoading(false);
     }
   }, [navigate, showToast]);
+
+  const loadMore = useCallback(async () => {
+    if (!sessionStorage.getItem('isLoggedIn')) return;
+    const nextPage = currentPage + 1;
+    setIsLoadingMore(true);
+    try {
+      // Cookie sent automatically.
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/threads?page=${nextPage}&size=20`);
+      setThreads(prev => [...prev, ...res.data.content]);
+      setCurrentPage(nextPage);
+      setTotalPages(res.data.totalPages);
+    } catch {
+      showToast('Failed to load more threads.', 'error');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [currentPage, showToast]);
 
   useEffect(() => { fetchThreads(); }, [fetchThreads]);
 
@@ -391,8 +393,8 @@ export default function HomeFeed() {
                 return (
                     <button key={role} onClick={() => setFilterRole(sel ? null : role)}
                             className={`shrink-0 px-4 py-1.5 rounded-full border font-dm text-xs tracking-wide transition-all
-                                    ${sel ? `${rc.bg} ${rc.text} border-transparent` : 'bg-transparent border-[#475B5A] text-[#FCFCFC]/50 hover:text-[#FCFCFC] hover:border-[#FFD4CA]'}`}
-                            style={sel ? { borderColor: rc.dot + '60' } : {}}>
+                                    ${!sel && 'bg-transparent border-[#475B5A] text-[#FCFCFC]/50 hover:text-[#FCFCFC] hover:border-[#FFD4CA]'}`}
+                            style={sel ? { backgroundColor: rc.bg, color: rc.text, borderColor: 'transparent' } : {}}>
                       {role}
                     </button>
                 );
@@ -446,6 +448,23 @@ export default function HomeFeed() {
                   ))}
                 </div>
             )}
+
+            {/* Load More — only shown when not filtering/searching and more pages exist */}
+            {!isLoading && !search && !filterRole && currentPage + 1 < totalPages && (
+                <div className="flex justify-center mt-8">
+                  <button
+                      onClick={loadMore}
+                      disabled={isLoadingMore}
+                      className="flex items-center gap-2 font-dm text-xs uppercase tracking-[0.2em] text-[#FCFCFC]/40 hover:text-[#FFD4CA] border border-[#475B5A]/60 hover:border-[#FFD4CA]/40 px-7 py-3 rounded-xl transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
+                    {isLoadingMore ? (
+                        <>
+                          <span className="w-3 h-3 rounded-full border border-[#FCFCFC]/30 border-t-[#FFD4CA] animate-spin" />
+                          Loading…
+                        </>
+                    ) : 'Load more threads'}
+                  </button>
+                </div>
+            )}
           </div>
         </div> {/* end z-10 content wrapper */}
       </div>
@@ -457,9 +476,9 @@ export default function HomeFeed() {
 const THREAD_NODES = [
   { role: 'Composer',        color: '#FFD4CA', cx: '14%', label: 'Composer'        },
   { role: 'Lyricist',        color: '#FF4439', cx: '32%', label: 'Lyricist'        },
-  { role: 'Singer',          color: '#B72F30', cx: '51%', label: 'Singer'          },
-  { role: 'Producer',        color: '#FCFCFC', cx: '70%', label: 'Producer'        },
-  { role: 'Instrumentalist', color: '#475B5A', cx: '88%', label: 'Instrumentalist' },
+  { role: 'Singer',          color: '#FB7185', cx: '51%', label: 'Singer'          },
+  { role: 'Producer',        color: '#2DD4BF', cx: '70%', label: 'Producer'        },
+  { role: 'Instrumentalist', color: '#A3E635', cx: '88%', label: 'Instrumentalist' },
 ];
 
 function AalapHero({ userName }: { userName: string }) {
@@ -639,7 +658,8 @@ function ThreadCard({ thread, index, onClick, onCreatorClick }: ThreadCardProps)
                                                 {contributor.name}
                                             </span>
                             <span
-                                className={`font-dm text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded ${rc.bg} ${rc.text} whitespace-nowrap`}
+                                className="font-dm text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap"
+                                style={{ backgroundColor: rc.bg, color: rc.text }}
                             >
                                                 {contributor.role.split(' - ')[0]}
                                             </span>

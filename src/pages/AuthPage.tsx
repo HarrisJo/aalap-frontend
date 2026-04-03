@@ -442,7 +442,12 @@ export default function AuthPage() {
         setIsLoading(true);
         try {
             const data = await AuthService.login(loginEmail, loginPassword);
-            localStorage.setItem('token', data.token);
+            // JWT is now in an HttpOnly cookie set by the server.
+            // Store only non-sensitive user info in sessionStorage for UI use.
+            sessionStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('userId',    String(data.userId));
+            sessionStorage.setItem('userName',   data.name);
+            sessionStorage.setItem('userEmail',  data.email);
             navigate('/home');
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -461,7 +466,11 @@ export default function AuthPage() {
         setIsLoading(true);
         try {
             const data = await AuthService.register(regName, regEmail, regPassword);
-            localStorage.setItem('token', data.token);
+            // Same as login — JWT is in the cookie, store only UI state here.
+            sessionStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('userId',    String(data.userId));
+            sessionStorage.setItem('userName',   data.name);
+            sessionStorage.setItem('userEmail',  data.email);
             navigate('/home');
         } catch (error) {
             if (axios.isAxiosError(error)) {

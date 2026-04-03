@@ -2,271 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { UserService } from '../services/UserService';
+import { AuthService } from '../services/AuthService';
+import type { ThreadSummary, ContributionResponse } from '../utils/profileUtils';
+import { useCountUp, getInitial } from '../utils/profileUtils';
+import { WaveformAvatar, FloatingNotes, RoleDNA, ContributionCard, ProfileThreadCard } from '../components/ProfileShared';
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// ─── TYPES (ProfilePage-specific) ─────────────────────────────────────────────
 
-interface UserInfo {
-    id: number;
-    name: string;
-    email: string;
-}
+interface Toast { message: string; type: 'success' | 'error'; }
 
-interface ThreadSummary {
-    id: number;
-    title: string;
-    description: string;
-    createdBy: UserInfo;
-    createdAt: string;
-    contributionCount: number;
-    rolesWithContributors: { [role: string]: string[] };
-}
-
-interface ContributionResponse {
-    id: number;
-    role: string;
-    noolId: number;
-    noolTitle: string;
-    description: string;
-    filePath: string;
-    createdAt: string;
-}
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-const ROLE_COLORS: Record<string, { dot: string; bg: string; text: string; glow: string }> = {
-    composer:        { dot: '#FFD4CA', bg: 'rgba(255,212,202,0.1)',  text: '#FFD4CA', glow: 'rgba(255,212,202,0.3)' },
-    lyricist:        { dot: '#FF4439', bg: 'rgba(255,68,57,0.1)',    text: '#FF4439', glow: 'rgba(255,68,57,0.3)'   },
-    singer:          { dot: '#FB7185', bg: 'rgba(251,113,133,0.1)',  text: '#FB7185', glow: 'rgba(251,113,133,0.3)' },
-    producer:        { dot: '#2DD4BF', bg: 'rgba(45,212,191,0.1)',   text: '#2DD4BF', glow: 'rgba(45,212,191,0.3)'  },
-    instrumentalist: { dot: '#A3E635', bg: 'rgba(163,230,53,0.1)',   text: '#A3E635', glow: 'rgba(163,230,53,0.3)'  },
-};
-const DEFAULT_RC = { dot: '#ffffff20', bg: 'rgba(255,255,255,0.04)', text: '#ffffff40', glow: 'rgba(255,255,255,0.1)' };
-
-function getRoleColor(role: string) {
-    return ROLE_COLORS[role.split(' - ')[0].toLowerCase().trim()] ?? DEFAULT_RC;
-}
-
-function timeAgo(dateStr: string): string {
-    const diff  = Date.now() - new Date(dateStr).getTime();
-    const mins  = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days  = Math.floor(diff / 86400000);
-    if (mins  < 60) return `${mins}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days  < 7)  return `${days}d ago`;
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function getInitial(name?: string) {
-    return (name ?? '?').charAt(0).toUpperCase();
-}
-
-// ─── COUNT-UP HOOK ────────────────────────────────────────────────────────────
-
-function useCountUp(target: number, duration = 1400, delay = 0) {
-    const [value, setValue] = useState(0);
-    useEffect(() => {
-        if (target === 0) { setValue(0); return; }
-        let start: number | null = null;
-        let raf: number;
-        const timeout = setTimeout(() => {
-            const step = (ts: number) => {
-                if (!start) start = ts;
-                const progress = Math.min((ts - start) / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 3);
-                setValue(Math.floor(eased * target));
-                if (progress < 1) raf = requestAnimationFrame(step);
-                else setValue(target);
-            };
-            raf = requestAnimationFrame(step);
-        }, delay);
-        return () => { clearTimeout(timeout); cancelAnimationFrame(raf); };
-    }, [target, duration, delay]);
-    return value;
-}
-
-// ─── WAVEFORM AVATAR ──────────────────────────────────────────────────────────
-
-function WaveformAvatar({ initial, isReady }: { initial: string; isReady: boolean }) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const rafRef    = useRef<number>(0);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d')!;
-        const W = canvas.width = 220;
-        const H = canvas.height = 220;
-        const cx = W / 2, cy = H / 2;
-
-        const draw = (ts: number) => {
-            ctx.clearRect(0, 0, W, H);
-            const t = ts / 1000;
-
-            const rings = [
-                { r: 72, bars: 48, speed: 0.6, amp: 6,  color: 'rgba(255,68,57,0.5)',    width: 1.5 },
-                { r: 84, bars: 60, speed: 0.9, amp: 4,  color: 'rgba(255,212,202,0.25)', width: 1   },
-                { r: 96, bars: 72, speed: 0.4, amp: 3,  color: 'rgba(71,91,90,0.4)',      width: 1   },
-            ];
-
-            rings.forEach(ring => {
-                for (let i = 0; i < ring.bars; i++) {
-                    const angle = (i / ring.bars) * Math.PI * 2 - Math.PI / 2;
-                    const wave  = Math.sin(i * 0.4 + t * ring.speed * 2) * ring.amp
-                        + Math.sin(i * 0.15 + t * ring.speed) * (ring.amp * 0.5);
-                    const r1    = ring.r;
-                    const r2    = ring.r + Math.max(1.5, wave + ring.amp);
-                    ctx.beginPath();
-                    ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
-                    ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
-                    ctx.strokeStyle = ring.color;
-                    ctx.lineWidth   = ring.width;
-                    ctx.stroke();
-                }
-            });
-
-            // Outer glow ring
-            const glowR = 105 + Math.sin(t * 0.8) * 3;
-            const grad  = ctx.createRadialGradient(cx, cy, glowR - 4, cx, cy, glowR + 4);
-            grad.addColorStop(0, 'rgba(255,68,57,0)');
-            grad.addColorStop(0.5, 'rgba(255,68,57,0.12)');
-            grad.addColorStop(1, 'rgba(255,68,57,0)');
-            ctx.beginPath();
-            ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
-            ctx.strokeStyle = grad;
-            ctx.lineWidth   = 8;
-            ctx.stroke();
-
-            rafRef.current = requestAnimationFrame(draw);
-        };
-
-        rafRef.current = requestAnimationFrame(draw);
-        return () => cancelAnimationFrame(rafRef.current);
-    }, []);
-
-    return (
-        <div className="relative flex items-center justify-center" style={{ width: 220, height: 220 }}>
-            <canvas ref={canvasRef} className="absolute inset-0"
-                    style={{ opacity: isReady ? 1 : 0, transition: 'opacity 1s ease' }} />
-            <div className="absolute inset-0 pointer-events-none" style={{
-                background: 'radial-gradient(ellipse 80px 80px at 50% 50%, rgba(255,68,57,0.2) 0%, transparent 70%)',
-                animation: 'glow-breathe 3s ease-in-out infinite',
-            }} />
-            <div className="relative z-10 w-28 h-28 rounded-full flex items-center justify-center"
-                 style={{
-                     background: 'linear-gradient(145deg, #1e2b29 0%, #0d1614 100%)',
-                     border: '1.5px solid rgba(255,212,202,0.15)',
-                     boxShadow: '0 0 0 1px rgba(255,68,57,0.1), 0 0 40px rgba(255,68,57,0.12), inset 0 1px 0 rgba(255,255,255,0.05)',
-                 }}>
-                <span className="font-anton text-5xl" style={{ color: '#FFD4CA' }}>{initial}</span>
-            </div>
-        </div>
-    );
-}
-
-// ─── FLOATING NOTES CANVAS ────────────────────────────────────────────────────
-
-function FloatingNotes() {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx    = canvas.getContext('2d')!;
-        const resize = () => { canvas.width = window.innerWidth; canvas.height = 340; };
-        resize();
-        window.addEventListener('resize', resize);
-
-        const NOTES = ['♩','♪','♫','♬','𝄞'];
-        const notes = Array.from({ length: 18 }, () => ({
-            x: Math.random() * window.innerWidth,
-            y: Math.random() * 340,
-            vy: -(0.15 + Math.random() * 0.25),
-            vx: (Math.random() - 0.5) * 0.2,
-            size: 10 + Math.random() * 10,
-            alpha: 0.04 + Math.random() * 0.07,
-            note: NOTES[Math.floor(Math.random() * NOTES.length)],
-            rot: (Math.random() - 0.5) * 0.01,
-            angle: Math.random() * 0.4 - 0.2,
-        }));
-
-        let raf: number;
-        const draw = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            notes.forEach(n => {
-                n.y += n.vy; n.x += n.vx; n.angle += n.rot;
-                if (n.y < -20) { n.y = canvas.height + 20; n.x = Math.random() * canvas.width; }
-                ctx.save();
-                ctx.translate(n.x, n.y);
-                ctx.rotate(n.angle);
-                ctx.globalAlpha = n.alpha;
-                ctx.fillStyle   = '#FFD4CA';
-                ctx.font        = `${n.size}px serif`;
-                ctx.fillText(n.note, 0, 0);
-                ctx.restore();
-            });
-            raf = requestAnimationFrame(draw);
-        };
-        raf = requestAnimationFrame(draw);
-        return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
-    }, []);
-    return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />;
-}
-
-// ─── ROLE DNA BAR ─────────────────────────────────────────────────────────────
-
-function RoleDNA({ threads }: { threads: ThreadSummary[] }) {
-    const counts: Record<string, number> = {};
-    threads.forEach(t =>
-        Object.keys(t.rolesWithContributors).forEach(r => {
-            const key = r.split(' - ')[0].toLowerCase().trim();
-            counts[key] = (counts[key] || 0) + 1;
-        })
-    );
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    if (total === 0) return null;
-
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-
-    return (
-        <div className="w-full max-w-xl mx-auto mb-12"
-             style={{ animation: 'fade-up 0.6s ease-out 0.9s both' }}>
-            <p className="font-dm text-[9px] uppercase tracking-[0.3em] text-white/20 text-center mb-3">
-                Thread DNA
-            </p>
-            <div className="flex h-2 rounded-full overflow-hidden w-full gap-[2px]">
-                {entries.map(([role, count], i) => {
-                    const rc  = getRoleColor(role);
-                    const pct = (count / total) * 100;
-                    return (
-                        <div key={role}
-                             style={{
-                                 width: `${pct}%`, height: '100%', borderRadius: 4,
-                                 backgroundColor: rc.dot,
-                                 boxShadow: `0 0 6px ${rc.glow}`,
-                                 animation: `dna-grow 0.8s cubic-bezier(0.34,1.56,0.64,1) ${0.9 + i * 0.1}s both`,
-                                 transform: 'scaleX(0)',
-                                 transformOrigin: 'left',
-                             }}
-                        />
-                    );
-                })}
-            </div>
-            <div className="flex flex-wrap justify-center gap-3 mt-3">
-                {entries.map(([role, count]) => {
-                    const rc = getRoleColor(role);
-                    return (
-                        <div key={role} className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rc.dot }} />
-                            <span className="font-dm text-[9px] uppercase tracking-wider" style={{ color: rc.text }}>
-                                {role} · {count}
-                            </span>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
@@ -283,19 +27,28 @@ export default function ProfilePage() {
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeletingProfile, setIsDeletingProfile] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+
+    const [toast, setToast]         = useState<Toast | null>(null);
+    const toastTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showToast = useCallback((message: string, type: Toast['type']) => {
+        setToast({ message, type });
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+    }, []);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
+        // Route guard — if no session flag, redirect to auth.
+        // The actual auth is enforced by the HttpOnly jwt cookie on the backend;
+        // this flag is just a fast client-side check to avoid a flash of content.
+        if (!sessionStorage.getItem('isLoggedIn')) {
             navigate('/auth');
             return;
         }
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            setUserEmail(payload.sub || '');
-        } catch {
-            navigate('/auth');
-        }
+        // Pre-populate email from sessionStorage (set on login) so it shows
+        // immediately, before the /me API call completes.
+        setUserEmail(sessionStorage.getItem('userEmail') || '');
         if (!sessionStorage.getItem('profileAnimated')) {
             setIsFirstVisit(true);
             sessionStorage.setItem('profileAnimated', 'true');
@@ -305,14 +58,11 @@ export default function ProfilePage() {
 
     // REPLACE the entire fetchMyThreads function with this:
     const fetchMyProfile = useCallback(async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
+        if (!sessionStorage.getItem('isLoggedIn')) return;
 
         try {
-            // Hit the new optimized VIP endpoint
-            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`, {
-                headers: {Authorization: `Bearer ${token}`},
-            });
+            // Cookie is sent automatically — no Authorization header needed.
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/me`);
 
             const profile = res.data; // This is now a UserProfileResponse object
 
@@ -325,45 +75,43 @@ export default function ProfilePage() {
 
         } catch (error) {
             console.error('Failed to load profile', error);
-            // Fallback just in case the token is old/invalid
-            if (axios.isAxiosError(error) && error.response?.status === 401) {
-                navigate('/auth');
+            // 401 interceptor in api.ts will redirect automatically
+            if (axios.isAxiosError(error) && error.response?.status !== 401) {
+                // non-auth error — just log it
             }
         } finally {
             setIsLoading(false);
         }
-    }, [navigate]);
+    }, []);
 
     // UPDATE the useEffect to call the new function
     useEffect(() => {
         fetchMyProfile();
     }, [fetchMyProfile]);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        sessionStorage.clear();
+    const handleLogout = async () => {
+        await AuthService.logout(); // clears the HttpOnly cookie server-side
         navigate('/');
     };
 
     const handleLeaveAalap = async () => {
-        setIsDeletingProfile(true); // Turns on the loading spinner
+        if (!deletePassword.trim()) return;
+        setIsDeletingProfile(true);
         try {
-            await UserService.deleteMyAccount(); // Calls your backend
-
-            // If successful, wipe their local storage so they are logged out
-            localStorage.removeItem('token');
-            sessionStorage.clear();
-            navigate('/'); // Boot them back to the landing page
+            await UserService.deleteMyAccount(deletePassword); // verifies password server-side
+            await AuthService.logout();                        // clears the HttpOnly cookie
+            navigate('/');
         } catch (error) {
             console.error('Failed to leave Aalap', error);
-            alert('Could not delete account. Please try again.');
+            showToast('Could not delete account. Check your password and try again.', 'error');
             setIsDeletingProfile(false);
-            setIsDeleteModalOpen(false); // Close the modal on failure
+            setIsDeleteModalOpen(false);
+            setDeletePassword('');
         }
     };
 
     const totalStems = threads.reduce((sum, t) => sum + t.contributionCount, 0);
-    const uniqueCollaborators = new Set(threads.flatMap(t => Object.values(t.rolesWithContributors).flat())).size;
+    const uniqueCollaborators = new Set(threads.flatMap(t => t.contributorIds)).size;
 
     const countThreads = useCountUp(isLoading ? 0 : threads.length, 1200, 700);
     const countStems = useCountUp(isLoading ? 0 : totalStems, 1400, 800);
@@ -396,6 +144,7 @@ export default function ProfilePage() {
                 @keyframes name-line    { from { transform:scaleX(0); opacity:0; }        to { transform:scaleX(1); opacity:1; } }
                 @keyframes tag-in       { from { opacity:0; transform:scale(0.8); }       to { opacity:1; transform:scale(1); } }
                 @keyframes spotlight    { 0%,100% { opacity:0.15; }  50% { opacity:0.3; } }
+                @keyframes toast-up     { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
             `}</style>
 
             {/* AMBIENT BACKGROUND */}
@@ -672,26 +421,49 @@ export default function ProfilePage() {
                 </div>
             )}
 
-            {/* ── DELETE CONFIRMATION MODAL ────────────────────────────────────────── */}
-            {isDeleteModalOpen && (
+            {/* ── TOAST ───────────────────────────────────────────────────────────── */}
+            {toast && (
+                <div className={`fixed bottom-8 left-1/2 z-[300] px-5 py-3 rounded-2xl
+                    text-sm font-dm backdrop-blur-md border shadow-2xl whitespace-nowrap
+                    ${toast.type === 'success' ? 'bg-[#344443]/90 border-[#475B5A] text-[#FFD4CA]' : 'bg-[#B72F30]/90 border-[#FF4439]/50 text-[#FCFCFC]'}`}
+                     style={{ animation: 'toast-up 0.25s ease-out', transform: 'translateX(-50%)' }}>
+                    {toast.message}
+                </div>
+            )}
+
+            {/* ── DELETE CONFIRMATION MODAL ────────────────────────────────────────── */}            {isDeleteModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-md"
-                         onClick={() => !isDeletingProfile && setIsDeleteModalOpen(false)}/>
+                         onClick={() => { if (!isDeletingProfile) { setIsDeleteModalOpen(false); setDeletePassword(''); } }}/>
                     <div
                         className="relative z-10 w-full max-w-[420px] bg-[#080C0B] border border-[#FF4439]/30 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#FF4439]/10"
                         style={{animation: 'fade-up 0.25s ease-out both'}}>
                         <h3 className="font-anton text-3xl uppercase tracking-wide text-white mb-2">Leave Aalap?</h3>
-                        <p className="font-dm text-sm text-white/50 mb-8 leading-relaxed">
+                        <p className="font-dm text-sm text-white/50 mb-6 leading-relaxed">
                             This will permanently delete your account, <strong className="text-white">all
                             sessions</strong> you've started, and <strong className="text-white">all
                             stems</strong> you've contributed to other threads. This action cannot be undone.
                         </p>
+                        {/* Re-authentication: user must confirm their password before we wipe the account */}
+                        <div className="mb-6">
+                            <label className="font-dm text-[10px] text-white/30 uppercase tracking-widest block mb-2">
+                                Confirm your password
+                            </label>
+                            <input
+                                type="password"
+                                value={deletePassword}
+                                onChange={e => setDeletePassword(e.target.value)}
+                                placeholder="Enter your password"
+                                disabled={isDeletingProfile}
+                                className="w-full bg-white/[0.03] border border-white/10 focus:border-[#FF4439]/40 text-white placeholder:text-white/20 px-4 py-3 rounded-xl font-dm text-sm focus:outline-none transition-colors disabled:opacity-50"
+                            />
+                        </div>
                         <div className="flex flex-col gap-3">
-                            <button onClick={handleLeaveAalap} disabled={isDeletingProfile}
+                            <button onClick={handleLeaveAalap} disabled={isDeletingProfile || !deletePassword.trim()}
                                     className="w-full font-anton text-sm tracking-[0.15em] uppercase bg-[#FF4439] text-white hover:bg-[#B72F30] py-4 rounded-xl transition-colors flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed">
                                 {isDeletingProfile ? 'Erasing Presence...' : 'Yes, Delete Everything'}
                             </button>
-                            <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingProfile}
+                            <button onClick={() => { setIsDeleteModalOpen(false); setDeletePassword(''); }} disabled={isDeletingProfile}
                                     className="w-full font-dm text-sm text-white/40 hover:text-white py-3 transition-colors disabled:opacity-50">
                                 Cancel
                             </button>
@@ -702,180 +474,5 @@ export default function ProfilePage() {
         </div>
     );
 }
-function ContributionCard({ stem, onClick }: { stem: ContributionResponse; onClick: () => void }) {
-    const rc = getRoleColor(stem.role);
 
-    return (
-        <div
-            onClick={onClick}
-            className="group relative bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 cursor-pointer hover:border-[#FF4439]/30 transition-all"
-        >
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                        <span className="font-anton text-[10px] tracking-widest uppercase" style={{ color: rc.dot }}>
-                            {stem.role.split(' - ')[0]}
-                        </span>
-                        <span className="text-[10px] text-white/20">•</span>
-                        <span className="font-dm text-[10px] text-white/40 uppercase tracking-wider truncate max-w-[120px]">
-                            {stem.noolTitle}
-                        </span>
-                    </div>
-                    <p className="font-dm text-sm text-white/70 line-clamp-1">
-                        {stem.description || "Added to thread"}
-                    </p>
-                </div>
-                <span className="font-dm text-[9px] text-white/20 uppercase tracking-widest whitespace-nowrap">
-                    {timeAgo(stem.createdAt)}
-                </span>
-            </div>
-        </div>
-    );
-}
 
-// ─── PROFILE THREAD CARD ──────────────────────────────────────────────────────
-
-interface ProfileThreadCardProps {
-    thread: ThreadSummary;
-    index: number;
-    isFirstVisit: boolean;
-    onClick: () => void;
-}
-
-function ProfileThreadCard({ thread, index, isFirstVisit, onClick }: ProfileThreadCardProps) {
-    const roles           = Object.keys(thread.rolesWithContributors);
-    const allContributors = Object.values(thread.rolesWithContributors).flat();
-    const [hovered, setHovered] = useState(false);
-
-    return (
-        <div className="group relative rounded-2xl overflow-hidden cursor-pointer"
-             style={{
-                 background: hovered
-                     ? 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,68,57,0.02) 100%)'
-                     : 'rgba(255,255,255,0.015)',
-                 border: `1px solid ${hovered ? 'rgba(255,68,57,0.2)' : 'rgba(255,255,255,0.05)'}`,
-                 boxShadow: hovered ? '0 16px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,68,57,0.08)' : 'none',
-                 transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
-                 transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease',
-                 animation: isFirstVisit ? `card-rise 0.5s ease-out ${0.9 + index * 0.1}s both` : undefined,
-             }}
-             onClick={onClick}
-             onMouseEnter={() => setHovered(true)}
-             onMouseLeave={() => setHovered(false)}>
-
-            {/* Shimmer sweep */}
-            {hovered && (
-                <div className="absolute inset-y-0 w-1/2 pointer-events-none"
-                     style={{
-                         background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.025), transparent)',
-                         animation: 'scan-right 0.6s ease-out',
-                     }} />
-            )}
-
-            {/* Left accent bar */}
-            <div className="absolute left-0 top-0 bottom-0 w-[2px] transition-all duration-300 origin-bottom"
-                 style={{
-                     background: 'linear-gradient(to bottom, #FF4439, rgba(255,68,57,0.3))',
-                     opacity: hovered ? 1 : 0,
-                     transform: hovered ? 'scaleY(1)' : 'scaleY(0)',
-                 }} />
-
-            {/* Top role color stripe */}
-            {roles.length > 0 && (
-                <div className="h-[1px] w-full opacity-40"
-                     style={{ background: `linear-gradient(90deg, ${getRoleColor(roles[0]).dot}, transparent)` }} />
-            )}
-
-            <div className="p-6 flex flex-col gap-4">
-                {/* Title + time */}
-                <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-anton text-2xl tracking-wide uppercase leading-none text-white/80 group-hover:text-white transition-colors duration-200">
-                        {thread.title}
-                    </h3>
-                    <span className="font-dm text-[10px] text-[#FFD4CA]/30 uppercase tracking-widest shrink-0 mt-0.5 whitespace-nowrap">
-                        {timeAgo(thread.createdAt)}
-                    </span>
-                </div>
-
-                {thread.description && (
-                    <p className="font-dm text-sm text-white/35 leading-relaxed line-clamp-2 -mt-1">
-                        {thread.description}
-                    </p>
-                )}
-
-                {/* Role tags */}
-                {roles.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                        {roles.slice(0, 5).map((role, i) => {
-                            const rc = getRoleColor(role);
-                            return (
-                                <span key={role}
-                                      className="font-dm text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-lg"
-                                      style={{
-                                          backgroundColor: rc.bg, color: rc.text,
-                                          border: `1px solid ${rc.dot}18`,
-                                          animation: isFirstVisit ? `tag-in 0.3s ease-out ${1.1 + index * 0.1 + i * 0.05}s both` : undefined,
-                                      }}>
-                                    {role.split(' - ')[0]}
-                                </span>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2">
-                        <span className="w-1 h-1 rounded-full bg-[#475B5A]" />
-                        <span className="font-dm text-[10px] text-white/20 uppercase tracking-wider italic">
-                            Awaiting first voice
-                        </span>
-                    </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-3.5 border-t mt-1"
-                     style={{ borderColor: hovered ? 'rgba(255,68,57,0.1)' : 'rgba(255,255,255,0.05)', transition: 'border-color 0.3s ease' }}>
-
-                    {/* Stacked avatars */}
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center">
-                            {allContributors.slice(0, 5).map((name, i) => (
-                                <div key={i}
-                                     className="w-7 h-7 rounded-full flex items-center justify-center font-anton text-[11px] border"
-                                     style={{
-                                         marginLeft: i > 0 ? -8 : 0, zIndex: 10 - i,
-                                         backgroundColor: '#0d1614', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)',
-                                     }}>
-                                    {getInitial(name)}
-                                </div>
-                            ))}
-                            {allContributors.length > 5 && (
-                                <div className="w-7 h-7 rounded-full flex items-center justify-center font-dm text-[9px] border"
-                                     style={{ marginLeft: -8, zIndex: 0, backgroundColor: '#0d1614', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.25)' }}>
-                                    +{allContributors.length - 5}
-                                </div>
-                            )}
-                        </div>
-                        {allContributors.length === 0 && (
-                            <span className="font-dm text-[10px] text-white/15 italic">No contributors yet</span>
-                        )}
-                    </div>
-
-                    {/* Stem count */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200"
-                         style={{
-                             background: hovered ? 'rgba(255,68,57,0.08)' : 'rgba(255,255,255,0.03)',
-                             border: `1px solid ${hovered ? 'rgba(255,68,57,0.2)' : 'rgba(255,255,255,0.06)'}`,
-                         }}>
-                        <svg className="w-3 h-3 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                             style={{ color: hovered ? '#FF4439' : 'rgba(255,255,255,0.2)' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-                        </svg>
-                        <span className="font-dm text-[11px] uppercase tracking-widest transition-colors duration-200"
-                              style={{ color: hovered ? 'rgba(255,212,202,0.7)' : 'rgba(255,255,255,0.25)' }}>
-                            {thread.contributionCount} {thread.contributionCount === 1 ? 'stem' : 'stems'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}

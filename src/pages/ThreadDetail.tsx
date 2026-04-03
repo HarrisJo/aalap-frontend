@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ThreadService } from '../services/ThreadService.ts';
-import { createPortal } from 'react-dom'; // Add this
+import { createPortal } from 'react-dom';
+import { getDetailRoleColor } from '../utils/roleColors';
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface UserInfo { id: number; name: string; email?: string; }
+interface UserInfo { id: number; name: string; }
 
 interface Contribution {
     id: number; role: string; user?: UserInfo;
@@ -31,18 +32,7 @@ const ROLES = [
     { value: 'Instrumentalist', icon: '🎸' },
 ];
 
-const ROLE_COLORS: Record<string, { label: string; dot: string; glow: string; track: string; bar: string }> = {
-    composer:        { label: '#F59E0B', dot: '#F59E0B', glow: 'rgba(245,158,11,0.35)', track: 'rgba(245,158,11,0.06)', bar: '#F59E0B' },
-    lyricist:        { label: '#A78BFA', dot: '#A78BFA', glow: 'rgba(167,139,250,0.35)', track: 'rgba(167,139,250,0.06)', bar: '#A78BFA' },
-    singer:          { label: '#FB7185', dot: '#FB7185', glow: 'rgba(251,113,133,0.35)', track: 'rgba(251,113,133,0.06)', bar: '#FB7185' },
-    producer:        { label: '#2DD4BF', dot: '#2DD4BF', glow: 'rgba(45,212,191,0.35)', track: 'rgba(45,212,191,0.06)', bar: '#2DD4BF' },
-    instrumentalist: { label: '#A3E635', dot: '#A3E635', glow: 'rgba(163,230,53,0.35)',  track: 'rgba(163,230,53,0.06)',  bar: '#A3E635' },
-};
-const DEFAULT_RC = { label: '#ffffff40', dot: '#ffffff30', glow: 'rgba(255,255,255,0.1)', track: 'rgba(255,255,255,0.03)', bar: '#ffffff30' };
-
-function getRoleColor(role: string) {
-    return ROLE_COLORS[role.split(' - ')[0].toLowerCase().trim()] ?? DEFAULT_RC;
-}
+function getRoleColor(role: string) { return getDetailRoleColor(role); }
 function formatTime(secs: number) {
     if (!isFinite(secs) || secs < 0) return '0:00';
     return `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, '0')}`;
@@ -83,7 +73,7 @@ export default function ThreadDetailPage() {
 
     const [thread, setThread]       = useState<ThreadDetail | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [loggedInEmail, setLoggedInEmail] = useState<string | null>(null);
+    const [loggedInUserId, setLoggedInUserId] = useState<number | null>(null);
 
     const audioRef                  = useRef<HTMLAudioElement | null>(null);
     const [playingId, setPlayingId] = useState<number | string | null>(null);
@@ -108,12 +98,11 @@ export default function ThreadDetailPage() {
     const [isDeletingThread, setIsDeletingThread]             = useState(false);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            setLoggedInEmail(payload.sub ?? null);
-        } catch { console.warn('Could not decode JWT payload'); }
+        // Read the logged-in user's ID from sessionStorage (set on login).
+        // The JWT is in an HttpOnly cookie — we can't decode it in JS anymore,
+        // which is the whole point. sessionStorage holds only non-sensitive UI state.
+        const id = sessionStorage.getItem('userId');
+        setLoggedInUserId(id ? Number(id) : null);
     }, []);
 
     const showToast = useCallback((message: string, type: Toast['type']) => {
@@ -123,12 +112,11 @@ export default function ThreadDetailPage() {
     }, []);
 
     const fetchThread = useCallback(async () => {
-        const token = localStorage.getItem('token');
-        if (!token) { navigate('/auth'); return; }
+        if (!sessionStorage.getItem('isLoggedIn')) { navigate('/auth'); return; }
         try {
+            // Cookie is sent automatically — no Authorization header needed.
             const res = await axios.get(
-                `${import.meta.env.VITE_API_URL}/api/threads/${id}`,
-                { headers: { Authorization: `Bearer ${token}` } }
+                `${import.meta.env.VITE_API_URL}/api/threads/${id}`
             );
             setThread(res.data);
         } catch { console.error('Failed to load thread'); }
@@ -458,7 +446,7 @@ export default function ThreadDetailPage() {
                             </span>
                         </div>
 
-                        {loggedInEmail !== null && thread.createdBy?.email === loggedInEmail && (
+                        {loggedInUserId !== null && thread.createdBy?.id === loggedInUserId && (
                             !confirmingDeleteThread ? (
                                 <button
                                     title="Delete this session"
@@ -633,7 +621,6 @@ export default function ThreadDetailPage() {
 
                 {thread.masterAudioUrl ? (
                     <MasterTrack
-                        url={thread.masterAudioUrl}
                         isPlaying={playingId === 'master'}
                         progress={progress}
                         duration={duration}
@@ -678,7 +665,7 @@ export default function ThreadDetailPage() {
                                         onToggle={() => togglePlay(contrib.id)}
                                         onSeek={e => handleSeek(e, contrib.id)}
                                         onCreatorClick={() => contrib.user?.id && navigate(`/users/${contrib.user.id}`)}
-                                        isOwner={loggedInEmail !== null && contrib.user?.email === loggedInEmail}
+                                        isOwner={loggedInUserId !== null && contrib.user?.id === loggedInUserId}
                                         onDelete={() => handleDeleteContribution(contrib.id)}
                                         onReupload={(file) => handleReuploadContribution(contrib.id, file)}
                                         isMobile={isMobile}
@@ -982,13 +969,13 @@ function StemTrack({
 // ─── MASTER TRACK ─────────────────────────────────────────────────────────────
 
 interface MasterTrackProps {
-    url: string; isPlaying: boolean; progress: number; duration: number; currentTime: number;
+    isPlaying: boolean; progress: number; duration: number; currentTime: number;
     onToggle: () => void; onSeek: (e: React.MouseEvent<HTMLDivElement>) => void;
     volume: number; onVolume: (v: number) => void;
     isMobile: boolean;
 }
 
-function MasterTrack({ url, isPlaying, progress, duration, currentTime, onToggle, onSeek, volume, onVolume, isMobile }: MasterTrackProps) {
+function MasterTrack({ isPlaying, progress, duration, currentTime, onToggle, onSeek, volume, onVolume, isMobile }: MasterTrackProps) {
     const bars = useMemo(() => generateBars(999, isMobile ? 32 : 64), [isMobile]);
 
     return (
@@ -1034,8 +1021,6 @@ function MasterTrack({ url, isPlaying, progress, duration, currentTime, onToggle
                             </span>
                         </div>
                     </div>
-                    {/* Hidden URL usage to satisfy TS/ESLint if not using for anything else yet */}
-                    <span className="hidden">{url}</span>
                 </div>
             </div>
         </div>
