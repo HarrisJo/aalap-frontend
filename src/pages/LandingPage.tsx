@@ -145,48 +145,7 @@ function HeroThread() {
   );
 }
 
-// ─── MOBILE ROLE FEED ────────────────────────────────────────────────────────
-function MobileRoleFeed() {
-  const items = [
-    { role: 'Composer',        name: 'Arjun',  action: 'seeded a melody',    color: '#FFD4CA' },
-    { role: 'Lyricist',        name: 'Priya',  action: 'wrote the words',    color: '#FF4439' },
-    { role: 'Singer',          name: 'Rahul',  action: 'recorded a take',    color: '#B72F30' },
-    { role: 'Producer',        name: 'Dev',    action: 'added the stems',    color: '#FCFCFC' },
-  ];
-  return (
-    <div className="flex flex-col gap-2">
-      {items.map((item, i) => (
-        <div
-          key={item.role}
-          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-          style={{
-            background: 'rgba(255,255,255,0.025)',
-            border: '1px solid rgba(255,255,255,0.055)',
-            borderLeft: `2px solid ${item.color}`,
-            animation: `feed-slide-in 0.7s cubic-bezier(0.16,1,0.3,1) ${0.5 + i * 0.12}s both`,
-          }}
-        >
-          {/* Glowing dot */}
-          <div
-            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-            style={{ background: item.color, boxShadow: `0 0 6px ${item.color}` }}
-          />
-          {/* Role label */}
-          <span
-            className="font-anton text-[10px] tracking-[0.12em] uppercase flex-shrink-0"
-            style={{ color: item.color, minWidth: '96px' }}
-          >
-            {item.role}
-          </span>
-          {/* Name + action */}
-          <span className="font-dm text-[12px] text-white/35 font-light truncate">
-            {item.name} · {item.action}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
+
 
 // ─── MAIN PAGE COMPONENT ──────────────────────────────────────────────────────
 export default function LandingPage() {
@@ -229,8 +188,6 @@ export default function LandingPage() {
                 @keyframes float-slow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
                 @keyframes float-slower { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
 
-                /* Mobile feed animation */
-                @keyframes feed-slide-in { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
             `}</style>
 
         {/* Ambient Background Glows */}
@@ -294,14 +251,6 @@ export default function LandingPage() {
             >
               Bring your tune, your chords, your lyrics, or your voice. The rest of the network fills in the blanks.
             </p>
-          </div>
-
-          {/* ── MIDDLE: Live activity feed ── */}
-          <div style={{ animation: 'fade-up 0.8s ease-out 0.45s both' }}>
-            <p className="font-dm text-[9px] uppercase tracking-[0.38em] text-white/20 mb-3">
-              Right now on Aalap
-            </p>
-            <MobileRoleFeed />
           </div>
 
           {/* ── BOTTOM: CTA ── */}
