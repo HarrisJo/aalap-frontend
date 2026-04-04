@@ -215,8 +215,8 @@ export default function LandingPage() {
             MOBILE HERO — visible only below md (< 768px)
             ══════════════════════════════════════════════════════════════════ */}
         <main
-          className="md:hidden relative z-10 flex flex-col justify-between px-6"
-          style={{ minHeight: '100dvh', paddingTop: '5.5rem', paddingBottom: '1.5rem' }}
+          className="md:hidden relative z-10 flex flex-col justify-center gap-12 px-6"
+          style={{ minHeight: '100dvh', paddingTop: '5rem', paddingBottom: '2rem' }}
         >
           {/* ── TOP: Eyebrow + Title + Divider + Subtitle ── */}
           <div>
