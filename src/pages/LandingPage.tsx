@@ -145,6 +145,49 @@ function HeroThread() {
   );
 }
 
+// ─── MOBILE ROLE FEED ────────────────────────────────────────────────────────
+function MobileRoleFeed() {
+  const items = [
+    { role: 'Composer',        name: 'Arjun',  action: 'seeded a melody',    color: '#FFD4CA' },
+    { role: 'Lyricist',        name: 'Priya',  action: 'wrote the words',    color: '#FF4439' },
+    { role: 'Singer',          name: 'Rahul',  action: 'recorded a take',    color: '#B72F30' },
+    { role: 'Producer',        name: 'Dev',    action: 'added the stems',    color: '#FCFCFC' },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((item, i) => (
+        <div
+          key={item.role}
+          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
+          style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(255,255,255,0.055)',
+            borderLeft: `2px solid ${item.color}`,
+            animation: `feed-slide-in 0.7s cubic-bezier(0.16,1,0.3,1) ${0.5 + i * 0.12}s both`,
+          }}
+        >
+          {/* Glowing dot */}
+          <div
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+            style={{ background: item.color, boxShadow: `0 0 6px ${item.color}` }}
+          />
+          {/* Role label */}
+          <span
+            className="font-anton text-[10px] tracking-[0.12em] uppercase flex-shrink-0"
+            style={{ color: item.color, minWidth: '96px' }}
+          >
+            {item.role}
+          </span>
+          {/* Name + action */}
+          <span className="font-dm text-[12px] text-white/35 font-light truncate">
+            {item.name} · {item.action}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── MAIN PAGE COMPONENT ──────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -185,6 +228,9 @@ export default function LandingPage() {
                 
                 @keyframes float-slow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
                 @keyframes float-slower { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+
+                /* Mobile feed animation */
+                @keyframes feed-slide-in { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
             `}</style>
 
         {/* Ambient Background Glows */}
@@ -208,8 +254,96 @@ export default function LandingPage() {
           </div>
         </nav>
 
-        {/* ── HERO SECTION ── */}
-        <main className="relative z-10 pt-32 pb-20 min-h-screen flex flex-col justify-center">
+        {/* ══════════════════════════════════════════════════════════════════
+            MOBILE HERO — visible only below md (< 768px)
+            ══════════════════════════════════════════════════════════════════ */}
+        <main
+          className="md:hidden relative z-10 flex flex-col justify-between px-6"
+          style={{ minHeight: '100dvh', paddingTop: '5.5rem', paddingBottom: '1.5rem' }}
+        >
+          {/* ── TOP: Eyebrow + Title + Divider + Subtitle ── */}
+          <div>
+            {/* Eyebrow */}
+            <div className="flex items-center gap-2.5 mb-5" style={{ animation: 'fade-up 0.7s ease-out 0.1s both' }}>
+              <span className="w-5 h-[1.5px]" style={{ background: 'linear-gradient(90deg, #FF4439, transparent)' }} />
+              <span className="font-dm text-[10px] text-[#FFD4CA]/50 uppercase tracking-[0.28em]">
+                Music collaboration, reimagined
+              </span>
+            </div>
+
+            {/* Title */}
+            <h1
+              className="font-anton text-[4rem] leading-[0.88] tracking-wide uppercase text-white mb-5"
+              style={{ animation: 'fade-up 0.8s cubic-bezier(0.16,1,0.3,1) 0.2s both' }}
+            >
+              Every song<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4439] to-[#FFD4CA]">starts</span><br />
+              with a seed.
+            </h1>
+
+            {/* Thin gradient rule */}
+            <div
+              className="w-12 h-[1px] mb-5"
+              style={{ background: 'linear-gradient(90deg, #FF4439, transparent)', animation: 'fade-up 0.7s ease-out 0.3s both' }}
+            />
+
+            {/* Subtitle */}
+            <p
+              className="font-dm text-[15px] text-white/40 leading-relaxed font-light"
+              style={{ animation: 'fade-up 0.8s ease-out 0.35s both' }}
+            >
+              Bring your tune, your chords, your lyrics, or your voice. The rest of the network fills in the blanks.
+            </p>
+          </div>
+
+          {/* ── MIDDLE: Live activity feed ── */}
+          <div style={{ animation: 'fade-up 0.8s ease-out 0.45s both' }}>
+            <p className="font-dm text-[9px] uppercase tracking-[0.38em] text-white/20 mb-3">
+              Right now on Aalap
+            </p>
+            <MobileRoleFeed />
+          </div>
+
+          {/* ── BOTTOM: CTA ── */}
+          <div style={{ animation: 'fade-up 0.8s ease-out 0.6s both' }}>
+            <div className="relative group/mob-cta">
+              {/* Glow halo */}
+              <div
+                className="absolute -inset-[1px] rounded-2xl pointer-events-none"
+                style={{ background: 'linear-gradient(135deg, #FF4439, #7A1A1A)', opacity: 0.45, filter: 'blur(10px)' }}
+              />
+              <button
+                onClick={() => navigate('/auth')}
+                className="relative z-10 w-full flex items-center justify-center gap-3 py-4 rounded-2xl overflow-hidden"
+                style={{ background: 'linear-gradient(135deg, #1a0808, #0a0505)' }}
+              >
+                {/* Hover slide-in fill */}
+                <div
+                  className="absolute inset-0 -translate-x-full group-hover/mob-cta:translate-x-0 transition-transform duration-[350ms] ease-out pointer-events-none"
+                  style={{ background: 'linear-gradient(90deg, #B72F30, #FF4439)' }}
+                />
+                <span className="relative z-10 font-anton text-[1.1rem] tracking-[0.22em] uppercase text-white/85 group-hover/mob-cta:text-white transition-colors duration-300">
+                  Start Creating
+                </span>
+                <svg
+                  className="relative z-10 w-4 h-4 text-white/50 group-hover/mob-cta:text-white group-hover/mob-cta:translate-x-1 transition-all duration-300"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="font-dm text-[9px] text-white/20 text-center mt-3 uppercase tracking-[0.35em]">
+              One thread. Infinite possibilities.
+            </p>
+          </div>
+        </main>
+
+        {/* ══════════════════════════════════════════════════════════════════
+            DESKTOP HERO — visible only at md+ (≥ 768px) — UNCHANGED INSIDE
+            ══════════════════════════════════════════════════════════════════ */}
+        <main className="hidden md:flex flex-col relative z-10 pt-32 pb-20 min-h-screen justify-center">
           <div className="max-w-[1200px] mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-8 items-center">
 
             {/* Left: Copy & CTA */}
@@ -315,3 +449,4 @@ export default function LandingPage() {
       </div>
   );
 }
+
