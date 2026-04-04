@@ -212,87 +212,9 @@ export default function LandingPage() {
         </nav>
 
         {/* ══════════════════════════════════════════════════════════════════
-            MOBILE HERO — visible only below md (< 768px)
+            HERO — single layout for all screen sizes
             ══════════════════════════════════════════════════════════════════ */}
-        <main
-          className="md:hidden relative z-10 flex flex-col justify-center gap-12 px-6"
-          style={{ minHeight: '100dvh', paddingTop: '5rem', paddingBottom: '2rem' }}
-        >
-          {/* ── TOP: Eyebrow + Title + Divider + Subtitle ── */}
-          <div>
-            {/* Eyebrow */}
-            <div className="flex items-center gap-2.5 mb-5" style={{ animation: 'fade-up 0.7s ease-out 0.1s both' }}>
-              <span className="w-5 h-[1.5px]" style={{ background: 'linear-gradient(90deg, #FF4439, transparent)' }} />
-              <span className="font-dm text-[10px] text-[#FFD4CA]/50 uppercase tracking-[0.28em]">
-                Music collaboration, reimagined
-              </span>
-            </div>
-
-            {/* Title */}
-            <h1
-              className="font-anton text-[4rem] leading-[0.88] tracking-wide uppercase text-white mb-5"
-              style={{ animation: 'fade-up 0.8s cubic-bezier(0.16,1,0.3,1) 0.2s both' }}
-            >
-              Every song<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4439] to-[#FFD4CA]">starts</span><br />
-              with a seed.
-            </h1>
-
-            {/* Thin gradient rule */}
-            <div
-              className="w-12 h-[1px] mb-5"
-              style={{ background: 'linear-gradient(90deg, #FF4439, transparent)', animation: 'fade-up 0.7s ease-out 0.3s both' }}
-            />
-
-            {/* Subtitle */}
-            <p
-              className="font-dm text-[15px] text-white/40 leading-relaxed font-light"
-              style={{ animation: 'fade-up 0.8s ease-out 0.35s both' }}
-            >
-              Bring your tune, your chords, your lyrics, or your voice. The rest of the network fills in the blanks.
-            </p>
-          </div>
-
-          {/* ── BOTTOM: CTA ── */}
-          <div style={{ animation: 'fade-up 0.8s ease-out 0.6s both' }}>
-            <div className="relative group/mob-cta">
-              {/* Glow halo */}
-              <div
-                className="absolute -inset-[1px] rounded-2xl pointer-events-none"
-                style={{ background: 'linear-gradient(135deg, #FF4439, #7A1A1A)', opacity: 0.45, filter: 'blur(10px)' }}
-              />
-              <button
-                onClick={() => navigate('/auth')}
-                className="relative z-10 w-full flex items-center justify-center gap-3 py-4 rounded-2xl overflow-hidden"
-                style={{ background: 'linear-gradient(135deg, #1a0808, #0a0505)' }}
-              >
-                {/* Hover slide-in fill */}
-                <div
-                  className="absolute inset-0 -translate-x-full group-hover/mob-cta:translate-x-0 transition-transform duration-[350ms] ease-out pointer-events-none"
-                  style={{ background: 'linear-gradient(90deg, #B72F30, #FF4439)' }}
-                />
-                <span className="relative z-10 font-anton text-[1.1rem] tracking-[0.22em] uppercase text-white/85 group-hover/mob-cta:text-white transition-colors duration-300">
-                  Start Creating
-                </span>
-                <svg
-                  className="relative z-10 w-4 h-4 text-white/50 group-hover/mob-cta:text-white group-hover/mob-cta:translate-x-1 transition-all duration-300"
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            <p className="font-dm text-[9px] text-white/20 text-center mt-3 uppercase tracking-[0.35em]">
-              One thread. Infinite possibilities.
-            </p>
-          </div>
-        </main>
-
-        {/* ══════════════════════════════════════════════════════════════════
-            DESKTOP HERO — visible only at md+ (≥ 768px) — UNCHANGED INSIDE
-            ══════════════════════════════════════════════════════════════════ */}
-        <main className="hidden md:flex flex-col relative z-10 pt-32 pb-20 min-h-screen justify-center">
+        <main className="flex flex-col relative z-10 pt-24 md:pt-32 pb-20 min-h-screen justify-center">
           <div className="max-w-[1200px] mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-8 items-center">
 
             {/* Left: Copy & CTA */}
@@ -302,7 +224,7 @@ export default function LandingPage() {
                 <span className="font-dm text-[11px] text-[#FFD4CA]/70 uppercase tracking-[0.3em]">Music collaboration, reimagined</span>
               </div>
 
-              <h1 className="font-anton text-[4.5rem] md:text-[6.5rem] lg:text-[7.5rem] leading-[0.85] tracking-wide uppercase text-white mb-6"
+              <h1 className="font-anton text-[5.5rem] md:text-[6.5rem] lg:text-[7.5rem] leading-[0.85] tracking-wide uppercase text-white mb-6"
                   style={{ animation: 'fade-up 0.8s cubic-bezier(0.16,1,0.3,1) 0.2s both' }}>
                 Every song<br/>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4439] to-[#FFD4CA]">starts</span><br/>
