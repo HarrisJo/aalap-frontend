@@ -5,20 +5,11 @@ import axios from 'axios';
 // This is what makes the browser send the HttpOnly jwt cookie to the backend.
 axios.defaults.withCredentials = true;
 
-// ─── CSRF INTERCEPTOR ────────────────────────────────────────────────────────
-// Spring Security sets an XSRF-TOKEN cookie (non-HttpOnly) on every response.
-// We read it here and echo it back as X-XSRF-TOKEN on every state-changing
-// request so Spring can validate the double-submit cookie pattern.
-// Auth endpoints (/api/auth/**) are exempt on the backend and don't need it.
-axios.interceptors.request.use((config) => {
-    const xsrfCookie = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('XSRF-TOKEN='));
-    if (xsrfCookie) {
-        config.headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfCookie.split('=')[1]);
-    }
-    return config;
-});
+// NOTE: CSRF protection is disabled on the backend for this stateless REST API.
+// The frontend (Vercel) and backend (HF Space / localhost) are on different domains.
+// document.cookie in the browser only shows cookies for the CURRENT domain (Vercel),
+// NOT for the backend's domain — so the old double-submit cookie CSRF pattern could
+// never work cross-origin. The backend is protected by CORS restrictions instead.
 
 // ─── GLOBAL 401 INTERCEPTOR ──────────────────────────────────────────────────
 // When a protected API call returns 401 (cookie expired / revoked),
