@@ -834,13 +834,7 @@ function StemTrack({
                     {isPlaying ? <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg> : <svg className="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
                 </button>
             )}
-            {hasText && (
-                <button onClick={() => setTextOpen(true)}
-                        className="px-2.5 py-1.5 rounded-lg font-dm text-[10px] uppercase tracking-widest transition-all"
-                        style={{ backgroundColor: rc.dot + '15', border: `1px solid ${rc.dot}40`, color: rc.dot }}>
-                    Read
-                </button>
-            )}
+
             {contrib.filePath && (
                 <a href={contrib.filePath.replace('/upload/', '/upload/fl_attachment/')}
                    target="_blank" rel="noopener noreferrer" download
@@ -911,10 +905,18 @@ function StemTrack({
                                 </div>
                             </div>
                         )}
+                        {!hasAudio && contrib.filePath && (
+                            <button
+                                onClick={() => setTextOpen(true)}
+                                className="w-full mt-1 py-2.5 rounded-xl font-dm text-xs uppercase tracking-widest transition-all text-center"
+                                style={{ backgroundColor: rc.dot + '15', border: `1px solid ${rc.dot}40`, color: rc.dot }}>
+                                Open Lyrics
+                            </button>
+                        )}
                         {contrib.description && <p className="font-dm text-[10px] text-white/25 truncate">{contrib.description}</p>}
                     </div>
                 </div>
-                {hasText && <LinedPaperModal isOpen={textOpen} onClose={() => setTextOpen(false)} fileUrl={contrib.filePath ?? ''} role={contrib.role} contributor={contrib.user?.name ?? ''} rc={rc} />}
+                {!hasAudio && <LinedPaperModal isOpen={textOpen} onClose={() => setTextOpen(false)} fileUrl={contrib.filePath ?? ''} role={contrib.role} contributor={contrib.user?.name ?? ''} rc={rc} />}
             </>
         );
     }
